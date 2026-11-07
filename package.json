@@ -1,0 +1,28 @@
+{
+  "name": "sample-oci-vm-docker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=local.env src/index.ts",
+    "db:migrate:local": "tsx --env-file=local.env src/migrate.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:init": "bash scripts/db-init.sh",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.6",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.16",
+    "mysql2": "^3.24.6",
+    "nodemailer": "^10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/nodemailer": "^8.0.2",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

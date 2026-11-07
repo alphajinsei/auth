@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>sample-oci-vm-docker</title>
+</head>
+<body>
+  <h1>メモ帳</h1>
+  <p>API の状態：<span id="health">確認中…</span></p>
+
+  <script>
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data) => {
+        document.getElementById("health").textContent = data.ok ? "OK" : "NG";
+      })
+      .catch(() => {
+        document.getElementById("health").textContent = "エラー";
+      });
+  </script>
+</body>
+</html>

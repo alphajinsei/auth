@@ -1,0 +1,7 @@
+.git/
+node_modules/
+dist/
+infra/
+.env
+local.env
+compose.override.yaml

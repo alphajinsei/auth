@@ -1,0 +1,12 @@
+# 本番（app VM）と手元で共通。手元では compose.override.yaml が自動で重なり、MySQL が足される
+services:
+  app:
+    build: .
+    image: sample-oci-vm-docker:latest
+    # VM の側のポートは、共通基盤の台帳で割り当てたもの（本番は deploy が .env に書く）
+    ports:
+      - "${APP_PORT:-8001}:3000"
+    env_file:
+      - path: .env
+        required: false # 手元にはない
+    restart: unless-stopped

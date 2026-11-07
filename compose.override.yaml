@@ -1,0 +1,44 @@
+# 手元だけ（docker compose が自動で読む。deploy は app VM に送らない）。
+# 本番の DB は HeatWave なので、同じ版の MySQL をコンテナで立てる
+services:
+  app:
+    environment:
+      DB_HOST: mysql
+      DB_USER: app
+      DB_PASSWORD: app
+      DB_NAME: app
+      # メールは Mailpit が受け取る（外へは出ない）。http://localhost:8025 で見る
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  mysql:
+    image: mysql:26.10.0 # HeatWave の版に合わせる
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: app
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    ports:
+      - "3306:3306" # npm run dev から使う
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # localhost だとソケットで聞くので、初期化中の仮のサーバーでも通ってしまう。TCP で聞く
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      retries: 20
+
+  # 手元用のメールの受け口（SMTP 1025、画面 8025）。送ったメールを外に出さずに見られる
+  mailpit:
+    image: axllent/mailpit:v1.21.0
+    ports:
+      - "1025:1025" # npm run dev から使う
+      - "8025:8025"
+
+volumes:
+  mysql-data:
