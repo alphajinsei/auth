@@ -3,6 +3,7 @@
 services:
   app:
     environment:
+      PUBLIC_ORIGIN: http://localhost:8002
       DB_HOST: mysql
       DB_USER: app
       DB_PASSWORD: app

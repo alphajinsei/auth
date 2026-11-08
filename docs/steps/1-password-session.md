@@ -28,7 +28,7 @@ sequenceDiagram
     A->>DB: 失敗の回数を0に戻す
     Note over A: セッション ID を乱数で作る（32バイト）
     A->>DB: セッションを記録（ID の SHA-256、利用者、期限）
-    A-->>B: 303 → /account<br/>Set-Cookie: __Host-session=ID; HttpOnly; Secure; SameSite=Lax; Path=/
+    A-->>B: 303 → /account<br/>Set-Cookie: __Host-session=ID#59; HttpOnly#59; Secure#59; SameSite=Lax#59; Path=/
   end
 ```
 
@@ -67,7 +67,7 @@ sequenceDiagram
   B->>A: POST /logout（Cookie 付き）
   Note over A: Origin ヘッダーが自分か確かめる（CSRF の対策）
   A->>DB: セッションの行を消す
-  A-->>B: 303 → /login<br/>Set-Cookie: __Host-session=; Max-Age=0
+  A-->>B: 303 → /login<br/>Set-Cookie: __Host-session=#59; Max-Age=0
 ```
 
 - ログアウトを GET にしない。GET だと、よそのサイトに `<img src="https://auth.alphajinsei.com/logout">` を置くだけで、勝手にログアウトさせられる。状態を変える操作は POST にし、Origin を確かめる。

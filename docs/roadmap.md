@@ -30,7 +30,7 @@
 - [x] 来歴：[パスワードとセッション](notes/extra-history-password-session.md)
 - [x] シーケンス図：[ログイン、以後のリクエスト、ログアウト](steps/1-password-session.md)
 - [x] 1-a：メモの API を取り除き、利用者とセッションのテーブルを作る。管理用のコマンドで利用者を作る（Argon2id）
-- [ ] 1-b：ログイン画面、セッションの Cookie、ログアウト
+- [x] 1-b：ログイン画面、セッションの Cookie、ログアウト
 - [ ] 1-c：失敗の回数による一時停止
 - [ ] 共通基盤に初めて載せる（`./tf.sh apply`、`npm run db:init`、`npm run deploy`）
 

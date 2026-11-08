@@ -9,4 +9,7 @@ services:
     env_file:
       - path: .env
         required: false # 手元にはない
+    environment:
+      # 外から見た自分の origin。手元のコンテナでは compose.override.yaml が上書きする
+      PUBLIC_ORIGIN: https://auth.alphajinsei.com
     restart: unless-stopped
