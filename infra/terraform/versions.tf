@@ -20,7 +20,7 @@ terraform {
   backend "oci" {
     bucket    = "tfstate"
     namespace = "nrliaoyraehn"
-    key       = "sample-oci-vm-docker/terraform.tfstate"
+    key       = "auth/terraform.tfstate"
     region    = "ap-tokyo-1"
   }
 }

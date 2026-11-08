@@ -1,9 +1,9 @@
 # ---- このアプリが共通基盤に足すもの：LB の振り分け1つ、DB のパスワード1つ（DNS は cloudflare.tf） ----
 
 locals {
-  name     = "sample-oci-vm-docker" # フォルダ名 ＝ リポジトリ名 ＝ サブドメイン
+  name     = "auth"                        # フォルダ名 ＝ リポジトリ名 ＝ サブドメイン
   hostname = "${local.name}.alphajinsei.com"
-  port     = 8001                          # 共通基盤の README のポートの台帳から
+  port     = 8002                          # 共通基盤の README のポートの台帳から
   db_name  = replace(local.name, "-", "_") # MySQL の名前にはハイフンを使わない
   db_user  = replace(local.name, "-", "_")
 }

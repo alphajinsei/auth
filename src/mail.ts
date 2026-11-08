@@ -9,4 +9,4 @@ export const transport = nodemailer.createTransport({
 	tls: process.env.SMTP_TLS_NAME ? { servername: process.env.SMTP_TLS_NAME } : undefined,
 });
 
-export const from = { name: 'sample-oci-vm-docker', address: process.env.MAIL_FROM ?? 'noreply@alphajinsei.com' };
+export const from = { name: 'auth', address: process.env.MAIL_FROM ?? 'noreply@alphajinsei.com' };

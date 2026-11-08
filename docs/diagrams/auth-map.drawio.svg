@@ -1,0 +1,188 @@
+<svg content="&lt;mxfile host=&quot;Electron&quot; type=&quot;device&quot;&gt;
+  &lt;diagram id=&quot;auth-map&quot; name=&quot;認証・認可の地図（A〜H は本文の節）&quot;&gt;
+    &lt;mxGraphModel dx=&quot;1320&quot; dy=&quot;820&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; guides=&quot;1&quot; tooltips=&quot;1&quot; connect=&quot;1&quot; arrows=&quot;1&quot; fold=&quot;1&quot; page=&quot;1&quot; pageScale=&quot;1&quot; pageWidth=&quot;1320&quot; pageHeight=&quot;820&quot; math=&quot;0&quot; shadow=&quot;0&quot;&gt;
+      &lt;root&gt;
+        &lt;mxCell id=&quot;0&quot;/&gt;
+        &lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;
+        &lt;mxCell id=&quot;title&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;認証・認可の地図（A〜H は本文の節）&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;fontColor=#212121;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;16&quot; width=&quot;700&quot; height=&quot;30&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;z_user&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;&amp;lt;b&amp;gt;利用者の側&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;container=1;collapsible=0;fillColor=#F5F5F5;strokeColor=#9E9E9E;strokeWidth=1.5;fontColor=#424242;fontSize=13;align=left;verticalAlign=top;spacingLeft=8;spacingTop=0;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;115&quot; width=&quot;220&quot; height=&quot;480&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;z_srv&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;&amp;lt;b&amp;gt;サーバーの側&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;container=1;collapsible=0;fillColor=#FFFFFF;strokeColor=#9E9E9E;strokeWidth=1.5;dashed=1;dashPattern=6 4;fontColor=#424242;fontSize=12;align=left;verticalAlign=top;spacingLeft=8;spacingTop=0;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;330&quot; y=&quot;115&quot; width=&quot;970&quot; height=&quot;480&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;user&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;利用者&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11px&amp;quot; color=&amp;quot;#555555&amp;quot;&amp;gt;ブラウザ&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#757575;strokeWidth=1.5;fontSize=12.5;fontColor=#212121;&quot; vertex=&quot;1&quot; parent=&quot;z_user&quot;&gt;&lt;mxGeometry x=&quot;25&quot; y=&quot;155&quot; width=&quot;170&quot; height=&quot;170&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;dir&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;F. ID 管理・ディレクトリ&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11px&amp;quot; color=&amp;quot;#555555&amp;quot;&amp;gt;LDAP・AD・SCIM&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;fillColor=#F1E6F7;strokeColor=#7B1FA2;strokeWidth=1.5;fontSize=12.5;fontColor=#212121;&quot; vertex=&quot;1&quot; parent=&quot;z_srv&quot;&gt;&lt;mxGeometry x=&quot;55&quot; y=&quot;30&quot; width=&quot;200&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;idp&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;IdP&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11px&amp;quot; color=&amp;quot;#555555&amp;quot;&amp;gt;OIDC プロバイダー&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11px&amp;quot; color=&amp;quot;#555555&amp;quot;&amp;gt;OAuth 認可サーバー&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;fillColor=#E6F4EA;strokeColor=#2E7D32;strokeWidth=1.5;fontSize=12.5;fontColor=#212121;&quot; vertex=&quot;1&quot; parent=&quot;z_srv&quot;&gt;&lt;mxGeometry x=&quot;55&quot; y=&quot;155&quot; width=&quot;200&quot; height=&quot;170&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;app&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;アプリ・API&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11px&amp;quot; color=&amp;quot;#555555&amp;quot;&amp;gt;RP・リソースサーバー&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;fillColor=#E6F4EA;strokeColor=#2E7D32;strokeWidth=1.5;fontSize=12.5;fontColor=#212121;&quot; vertex=&quot;1&quot; parent=&quot;z_srv&quot;&gt;&lt;mxGeometry x=&quot;415&quot; y=&quot;155&quot; width=&quot;200&quot; height=&quot;170&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;authz&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;E. 認可の判断&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11px&amp;quot; color=&amp;quot;#555555&amp;quot;&amp;gt;RBAC・ABAC・ReBAC&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;fillColor=#ECEFF1;strokeColor=#546E7A;strokeWidth=1.5;fontSize=12.5;fontColor=#212121;&quot; vertex=&quot;1&quot; parent=&quot;z_srv&quot;&gt;&lt;mxGeometry x=&quot;415&quot; y=&quot;385&quot; width=&quot;200&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;api&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;ほかの API&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11px&amp;quot; color=&amp;quot;#555555&amp;quot;&amp;gt;人がいない通信&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;fillColor=#E6F4EA;strokeColor=#2E7D32;strokeWidth=1.5;fontSize=12.5;fontColor=#212121;&quot; vertex=&quot;1&quot; parent=&quot;z_srv&quot;&gt;&lt;mxGeometry x=&quot;770&quot; y=&quot;155&quot; width=&quot;170&quot; height=&quot;170&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;h&quot; value=&quot;&amp;lt;font color=&amp;quot;#212121&amp;quot;&amp;gt;&amp;lt;b&amp;gt;H. 横断するもの&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style=&amp;quot;font-size:11.5px&amp;quot; color=&amp;quot;#333333&amp;quot;&amp;gt;署名と鍵（JWT・JWKS）、安全な乱数、時間が一定の比較、監査ログ、脅威のモデル、アカウントの回復&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;html=1;whiteSpace=wrap;fillColor=#E3EEFC;strokeColor=#1E6FD9;strokeWidth=1.5;fontSize=12.5;fontColor=#212121;align=left;verticalAlign=top;spacingLeft=10;spacingTop=2;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;620&quot; width=&quot;1280&quot; height=&quot;60&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_b0&quot; value=&quot;&quot; style=&quot;rounded=0;html=1;fillColor=#37474F;fillOpacity=5;strokeColor=none;locked=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;100&quot; width=&quot;220&quot; height=&quot;495&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_h0&quot; value=&quot;&amp;lt;font color=&amp;quot;#263238&amp;quot;&amp;gt;&amp;lt;b&amp;gt;利用者&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt; &amp;lt;font style=&amp;quot;font-size:11.5px&amp;quot; color=&amp;quot;#263238&amp;quot;&amp;gt;人とブラウザ&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=4;absoluteArcSize=1;html=1;fillColor=#CFD8DC;strokeColor=#90A4AE;fontColor=#263238;fontSize=13;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;70&quot; width=&quot;220&quot; height=&quot;28&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_b1&quot; value=&quot;&quot; style=&quot;rounded=0;html=1;fillColor=#37474F;fillOpacity=5;strokeColor=none;locked=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;360&quot; y=&quot;100&quot; width=&quot;250&quot; height=&quot;495&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_h1&quot; value=&quot;&amp;lt;font color=&amp;quot;#263238&amp;quot;&amp;gt;&amp;lt;b&amp;gt;IdP&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt; &amp;lt;font style=&amp;quot;font-size:11.5px&amp;quot; color=&amp;quot;#263238&amp;quot;&amp;gt;認証・トークンの発行&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=4;absoluteArcSize=1;html=1;fillColor=#CFD8DC;strokeColor=#90A4AE;fontColor=#263238;fontSize=13;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;360&quot; y=&quot;70&quot; width=&quot;250&quot; height=&quot;28&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_b2&quot; value=&quot;&quot; style=&quot;rounded=0;html=1;fillColor=#37474F;fillOpacity=5;strokeColor=none;locked=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;720&quot; y=&quot;100&quot; width=&quot;250&quot; height=&quot;495&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_h2&quot; value=&quot;&amp;lt;font color=&amp;quot;#263238&amp;quot;&amp;gt;&amp;lt;b&amp;gt;アプリ・API&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt; &amp;lt;font style=&amp;quot;font-size:11.5px&amp;quot; color=&amp;quot;#263238&amp;quot;&amp;gt;トークンを受け取る&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=4;absoluteArcSize=1;html=1;fillColor=#CFD8DC;strokeColor=#90A4AE;fontColor=#263238;fontSize=13;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;720&quot; y=&quot;70&quot; width=&quot;250&quot; height=&quot;28&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_b3&quot; value=&quot;&quot; style=&quot;rounded=0;html=1;fillColor=#37474F;fillOpacity=5;strokeColor=none;locked=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;1080&quot; y=&quot;100&quot; width=&quot;210&quot; height=&quot;495&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;col_h3&quot; value=&quot;&amp;lt;font color=&amp;quot;#263238&amp;quot;&amp;gt;&amp;lt;b&amp;gt;ほかの API&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt; &amp;lt;font style=&amp;quot;font-size:11.5px&amp;quot; color=&amp;quot;#263238&amp;quot;&amp;gt;サービス同士&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;arcSize=4;absoluteArcSize=1;html=1;fillColor=#CFD8DC;strokeColor=#90A4AE;fontColor=#263238;fontSize=13;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;1080&quot; y=&quot;70&quot; width=&quot;210&quot; height=&quot;28&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;a&quot; value=&quot;&amp;lt;font color=&amp;quot;#1E6FD9&amp;quot;&amp;gt;A. 本人確認&amp;lt;br&amp;gt;パスワード・TOTP・パスキー&amp;lt;/font&amp;gt;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#1E6FD9;strokeWidth=2.5;fontSize=11;fontColor=#1E6FD9;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.2647;exitDx=0;exitDy=0;entryX=0.0;entryY=0.2647;entryDx=0;entryDy=0;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;user&quot; target=&quot;idp&quot;&gt;&lt;mxGeometry x=&quot;0.0&quot; relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;0&quot; y=&quot;-20&quot; as=&quot;offset&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b&quot; value=&quot;&amp;lt;font color=&amp;quot;#1E6FD9&amp;quot;&amp;gt;B. セッション&amp;lt;br&amp;gt;Cookie で持ち回る&amp;lt;/font&amp;gt;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#1E6FD9;strokeWidth=2.5;fontSize=11;fontColor=#1E6FD9;labelBackgroundColor=#FFFFFF;exitX=0.0;exitY=0.7353;exitDx=0;exitDy=0;entryX=1.0;entryY=0.7353;entryDx=0;entryDy=0;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;idp&quot; target=&quot;user&quot;&gt;&lt;mxGeometry x=&quot;0.0&quot; relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;0&quot; y=&quot;-20&quot; as=&quot;offset&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;f&quot; value=&quot;&amp;lt;font color=&amp;quot;#7B1FA2&amp;quot;&amp;gt;利用者・グループを引く&amp;lt;/font&amp;gt;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#7B1FA2;strokeWidth=2.0;fontSize=11;fontColor=#7B1FA2;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;dir&quot; target=&quot;idp&quot;&gt;&lt;mxGeometry x=&quot;0.16&quot; relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;68&quot; y=&quot;-4&quot; as=&quot;offset&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;c&quot; value=&quot;&amp;lt;font color=&amp;quot;#00897B&amp;quot;&amp;gt;C. 連携（誰か）&amp;lt;br&amp;gt;ID トークン：OIDC・SAML&amp;lt;/font&amp;gt;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#00897B;strokeWidth=2.0;fontSize=11;fontColor=#00897B;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.2647;exitDx=0;exitDy=0;entryX=0.0;entryY=0.2647;entryDx=0;entryDy=0;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;idp&quot; target=&quot;app&quot;&gt;&lt;mxGeometry x=&quot;0.0&quot; relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;0&quot; y=&quot;-20&quot; as=&quot;offset&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;d&quot; value=&quot;&amp;lt;font color=&amp;quot;#00897B&amp;quot;&amp;gt;D. 委譲（権限）&amp;lt;br&amp;gt;アクセストークン：OAuth&amp;lt;/font&amp;gt;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#00897B;strokeWidth=2.0;fontSize=11;fontColor=#00897B;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.7353;exitDx=0;exitDy=0;entryX=0.0;entryY=0.7353;entryDx=0;entryDy=0;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;idp&quot; target=&quot;app&quot;&gt;&lt;mxGeometry x=&quot;0.0&quot; relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;0&quot; y=&quot;-20&quot; as=&quot;offset&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e&quot; value=&quot;&amp;lt;font color=&amp;quot;#546E7A&amp;quot;&amp;gt;この操作を許すか&amp;lt;/font&amp;gt;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#546E7A;strokeWidth=1.5;dashed=1;dashPattern=6 4;fontSize=11;fontColor=#546E7A;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;app&quot; target=&quot;authz&quot;&gt;&lt;mxGeometry x=&quot;0.14&quot; relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;52&quot; y=&quot;-4&quot; as=&quot;offset&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;g&quot; value=&quot;&amp;lt;font color=&amp;quot;#E65100&amp;quot;&amp;gt;G. 機械同士&amp;lt;br&amp;gt;mTLS・API キー・&amp;lt;br&amp;gt;クライアントクレデンシャル&amp;lt;/font&amp;gt;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=5;strokeColor=#E65100;strokeWidth=2.0;fontSize=11;fontColor=#E65100;labelBackgroundColor=#FFFFFF;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;app&quot; target=&quot;api&quot;&gt;&lt;mxGeometry x=&quot;0.0&quot; relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;0&quot; y=&quot;-27&quot; as=&quot;offset&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;legend&quot; value=&quot;&quot; style=&quot;rounded=1;arcSize=6;absoluteArcSize=1;fillColor=#FAFAFA;strokeColor=#E0E0E0;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;700&quot; width=&quot;1280&quot; height=&quot;100&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_t1&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;&amp;lt;b&amp;gt;箱の色（役割）&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;fontSize=12;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;30&quot; y=&quot;707&quot; width=&quot;110&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_r0&quot; value=&quot;&quot; style=&quot;rounded=1;arcSize=3;fillColor=#FFFFFF;strokeColor=#757575;strokeWidth=1.5;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;150&quot; y=&quot;709&quot; width=&quot;22&quot; height=&quot;16&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_rt0&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;利用者&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;178&quot; y=&quot;707&quot; width=&quot;54.5&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_r1&quot; value=&quot;&quot; style=&quot;rounded=1;arcSize=3;fillColor=#E6F4EA;strokeColor=#2E7D32;strokeWidth=1.5;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;254.5&quot; y=&quot;709&quot; width=&quot;22&quot; height=&quot;16&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_rt1&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;サーバー&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;282.5&quot; y=&quot;707&quot; width=&quot;66.0&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_r2&quot; value=&quot;&quot; style=&quot;rounded=1;arcSize=3;fillColor=#F1E6F7;strokeColor=#7B1FA2;strokeWidth=1.5;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;370.5&quot; y=&quot;709&quot; width=&quot;22&quot; height=&quot;16&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_rt2&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;名簿&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;398.5&quot; y=&quot;707&quot; width=&quot;43.0&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_r3&quot; value=&quot;&quot; style=&quot;rounded=1;arcSize=3;fillColor=#ECEFF1;strokeColor=#546E7A;strokeWidth=1.5;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;463.5&quot; y=&quot;709&quot; width=&quot;22&quot; height=&quot;16&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_rt3&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;アプリの中の判断&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;491.5&quot; y=&quot;707&quot; width=&quot;112.0&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_t2&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;&amp;lt;b&amp;gt;線（通信の種類）&amp;lt;/b&amp;gt;&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;fontSize=12;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;30&quot; y=&quot;748&quot; width=&quot;120&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_l0&quot; value=&quot;&quot; style=&quot;endArrow=block;endFill=1;endSize=5;html=1;strokeColor=#1E6FD9;strokeWidth=2.5;&quot; edge=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;150&quot; y=&quot;759&quot; as=&quot;sourcePoint&quot;/&gt;&lt;mxPoint x=&quot;190&quot; y=&quot;759&quot; as=&quot;targetPoint&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_lt0&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;利用者と IdP&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;198&quot; y=&quot;749&quot; width=&quot;93.6&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_l1&quot; value=&quot;&quot; style=&quot;endArrow=block;endFill=1;endSize=5;html=1;strokeColor=#00897B;strokeWidth=2.0;&quot; edge=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;313.6&quot; y=&quot;759&quot; as=&quot;sourcePoint&quot;/&gt;&lt;mxPoint x=&quot;353.6&quot; y=&quot;759&quot; as=&quot;targetPoint&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_lt1&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;トークンで渡す&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;361.6&quot; y=&quot;749&quot; width=&quot;100.5&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_l2&quot; value=&quot;&quot; style=&quot;endArrow=block;endFill=1;endSize=5;html=1;strokeColor=#7B1FA2;strokeWidth=2.0;&quot; edge=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;484.1&quot; y=&quot;759&quot; as=&quot;sourcePoint&quot;/&gt;&lt;mxPoint x=&quot;524.1&quot; y=&quot;759&quot; as=&quot;targetPoint&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_lt2&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;名簿を引く&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;532.1&quot; y=&quot;749&quot; width=&quot;77.5&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_l3&quot; value=&quot;&quot; style=&quot;endArrow=block;endFill=1;endSize=5;html=1;strokeColor=#E65100;strokeWidth=2.0;&quot; edge=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;631.6&quot; y=&quot;759&quot; as=&quot;sourcePoint&quot;/&gt;&lt;mxPoint x=&quot;671.6&quot; y=&quot;759&quot; as=&quot;targetPoint&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_lt3&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;サービス同士&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;679.6&quot; y=&quot;749&quot; width=&quot;89.0&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_l4&quot; value=&quot;&quot; style=&quot;endArrow=block;endFill=1;endSize=5;html=1;strokeColor=#546E7A;strokeWidth=1.5;dashed=1;dashPattern=6 4;&quot; edge=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;790.6&quot; y=&quot;759&quot; as=&quot;sourcePoint&quot;/&gt;&lt;mxPoint x=&quot;830.6&quot; y=&quot;759&quot; as=&quot;targetPoint&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_lt4&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;判断を仰ぐ&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;838.6&quot; y=&quot;749&quot; width=&quot;77.5&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_note&quot; value=&quot;&amp;lt;font color=&amp;quot;#757575&amp;quot;&amp;gt;FIDO2 は A、OAuth 2.0 は D（認証が欲しいなら C の OIDC）、LDAP は F&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=right;fontSize=10.5;fontColor=#757575;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;884&quot; y=&quot;777&quot; width=&quot;400&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+      &lt;/root&gt;
+    &lt;/mxGraphModel&gt;
+  &lt;/diagram&gt;
+&lt;/mxfile&gt;
+" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 820" width="1320" height="820" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif">
+<!-- 認証・認可の地図（A〜H は本文の節）。座標は左上が (0,0)。 -->
+<defs>
+  <marker id="arrow-web" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1E6FD9"/></marker>
+  <marker id="arrow-mail" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00897B"/></marker>
+  <marker id="arrow-db" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7B1FA2"/></marker>
+  <marker id="arrow-manage" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#616161"/></marker>
+  <marker id="arrow-egress" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9E9E9E"/></marker>
+  <marker id="arrow-send" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00897B"/></marker>
+  <marker id="arrow-recv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E65100"/></marker>
+  <marker id="arrow-both" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#546E7A"/></marker>
+  <marker id="arrow-token" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00897B"/></marker>
+  <marker id="arrow-machine" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E65100"/></marker>
+  <marker id="arrow-decide" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#546E7A"/></marker>
+</defs>
+<style>
+  .label { font-size: 11px; paint-order: stroke; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
+</style>
+<rect width="1320" height="820" fill="#FFFFFF"/>
+<text x="20" y="38" font-size="20" font-weight="700" fill="#212121">認証・認可の地図（A〜H は本文の節）</text>
+
+<!-- ===== 枠：背景の色＝基盤ごと ===== -->
+<g id="z_user">
+  <rect x="20" y="115" width="220" height="480" rx="6" fill="#F5F5F5" stroke="#9E9E9E" stroke-width="1.5"/>
+  <text x="30" y="135" font-size="13" font-weight="700" fill="#424242">利用者の側</text>
+</g>
+<g id="z_srv">
+  <rect x="330" y="115" width="970" height="480" rx="6" fill="#FFFFFF" stroke="#9E9E9E" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="340" y="135" font-size="12" font-weight="700" fill="#424242">サーバーの側</text>
+</g>
+
+<!-- ===== 列：見出しの札と薄い帯（機能ごとに列を分けている） ===== -->
+<rect x="20" y="100" width="220" height="495" fill="#37474F" fill-opacity="0.05"/>
+<rect x="20" y="70" width="220" height="28" rx="4" fill="#CFD8DC" stroke="#90A4AE"/>
+<text x="130.0" y="89" text-anchor="middle" font-size="13" font-weight="700" fill="#263238">利用者<tspan font-size="11.5" font-weight="400" fill="#263238" dx="8">人とブラウザ</tspan></text>
+<rect x="360" y="100" width="250" height="495" fill="#37474F" fill-opacity="0.05"/>
+<rect x="360" y="70" width="250" height="28" rx="4" fill="#CFD8DC" stroke="#90A4AE"/>
+<text x="485.0" y="89" text-anchor="middle" font-size="13" font-weight="700" fill="#263238">IdP<tspan font-size="11.5" font-weight="400" fill="#263238" dx="8">認証・トークンの発行</tspan></text>
+<rect x="720" y="100" width="250" height="495" fill="#37474F" fill-opacity="0.05"/>
+<rect x="720" y="70" width="250" height="28" rx="4" fill="#CFD8DC" stroke="#90A4AE"/>
+<text x="845.0" y="89" text-anchor="middle" font-size="13" font-weight="700" fill="#263238">アプリ・API<tspan font-size="11.5" font-weight="400" fill="#263238" dx="8">トークンを受け取る</tspan></text>
+<rect x="1080" y="100" width="210" height="495" fill="#37474F" fill-opacity="0.05"/>
+<rect x="1080" y="70" width="210" height="28" rx="4" fill="#CFD8DC" stroke="#90A4AE"/>
+<text x="1185.0" y="89" text-anchor="middle" font-size="13" font-weight="700" fill="#263238">ほかの API<tspan font-size="11.5" font-weight="400" fill="#263238" dx="8">サービス同士</tspan></text>
+
+<!-- ===== 線：色・線種＝通信の種類ごと（箱の下に描く） ===== -->
+<polyline id="a" points="215,315 385,315" fill="none" stroke="#1E6FD9" stroke-width="2.5" marker-end="url(#arrow-web)"/>
+<polyline id="b" points="385,395 215,395" fill="none" stroke="#1E6FD9" stroke-width="2.5" marker-end="url(#arrow-web)"/>
+<polyline id="f" points="485,215 485,270" fill="none" stroke="#7B1FA2" stroke-width="2.0" marker-end="url(#arrow-db)"/>
+<polyline id="c" points="585,315 745,315" fill="none" stroke="#00897B" stroke-width="2.0" marker-end="url(#arrow-token)"/>
+<polyline id="d" points="585,395 745,395" fill="none" stroke="#00897B" stroke-width="2.0" marker-end="url(#arrow-token)"/>
+<polyline id="e" points="845,440 845,500" fill="none" stroke="#546E7A" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow-decide)"/>
+<polyline id="g" points="945,355 1100,355" fill="none" stroke="#E65100" stroke-width="2.0" marker-end="url(#arrow-machine)"/>
+
+<!-- ===== 箱：色＝役割ごと ===== -->
+<g id="user">
+  <rect x="45" y="270" width="170" height="170" rx="6" fill="#FFFFFF" stroke="#757575" stroke-width="1.5"/>
+  <text x="130.0" y="351.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#212121">利用者</text>
+  <text x="130.0" y="366.5" text-anchor="middle" font-size="11" fill="#555555">ブラウザ</text>
+</g>
+<g id="dir">
+  <rect x="385" y="145" width="200" height="70" rx="6" fill="#F1E6F7" stroke="#7B1FA2" stroke-width="1.5"/>
+  <text x="485.0" y="176.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#212121">F. ID 管理・ディレクトリ</text>
+  <text x="485.0" y="191.5" text-anchor="middle" font-size="11" fill="#555555">LDAP・AD・SCIM</text>
+</g>
+<g id="idp">
+  <rect x="385" y="270" width="200" height="170" rx="6" fill="#E6F4EA" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="485.0" y="344.0" text-anchor="middle" font-size="12.5" font-weight="700" fill="#212121">IdP</text>
+  <text x="485.0" y="359.0" text-anchor="middle" font-size="11" fill="#555555">OIDC プロバイダー</text>
+  <text x="485.0" y="374.0" text-anchor="middle" font-size="11" fill="#555555">OAuth 認可サーバー</text>
+</g>
+<g id="app">
+  <rect x="745" y="270" width="200" height="170" rx="6" fill="#E6F4EA" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="845.0" y="351.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#212121">アプリ・API</text>
+  <text x="845.0" y="366.5" text-anchor="middle" font-size="11" fill="#555555">RP・リソースサーバー</text>
+</g>
+<g id="authz">
+  <rect x="745" y="500" width="200" height="70" rx="6" fill="#ECEFF1" stroke="#546E7A" stroke-width="1.5"/>
+  <text x="845.0" y="531.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#212121">E. 認可の判断</text>
+  <text x="845.0" y="546.5" text-anchor="middle" font-size="11" fill="#555555">RBAC・ABAC・ReBAC</text>
+</g>
+<g id="api">
+  <rect x="1100" y="270" width="170" height="170" rx="6" fill="#E6F4EA" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="1185.0" y="351.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#212121">ほかの API</text>
+  <text x="1185.0" y="366.5" text-anchor="middle" font-size="11" fill="#555555">人がいない通信</text>
+</g>
+<g id="h">
+  <rect x="20" y="620" width="1280" height="60" rx="6" fill="#E3EEFC" stroke="#1E6FD9" stroke-width="1.5"/>
+  <text x="32" y="640" font-size="12.5" font-weight="700" fill="#212121">H. 横断するもの</text>
+  <text x="32" y="657" font-size="11.5" fill="#333333">署名と鍵（JWT・JWKS）、安全な乱数、時間が一定の比較、監査ログ、脅威のモデル、アカウントの回復</text>
+</g>
+
+<!-- ===== 線のラベル ===== -->
+<text class="label" x="300" y="292" text-anchor="middle" fill="#1E6FD9">A. 本人確認</text>
+<text class="label" x="300" y="306" text-anchor="middle" fill="#1E6FD9">パスワード・TOTP・パスキー</text>
+<text class="label" x="300" y="372" text-anchor="middle" fill="#1E6FD9">B. セッション</text>
+<text class="label" x="300" y="386" text-anchor="middle" fill="#1E6FD9">Cookie で持ち回る</text>
+<text class="label" x="493" y="247" text-anchor="start" fill="#7B1FA2">利用者・グループを引く</text>
+<text class="label" x="665" y="292" text-anchor="middle" fill="#00897B">C. 連携（誰か）</text>
+<text class="label" x="665" y="306" text-anchor="middle" fill="#00897B">ID トークン：OIDC・SAML</text>
+<text class="label" x="665" y="372" text-anchor="middle" fill="#00897B">D. 委譲（権限）</text>
+<text class="label" x="665" y="386" text-anchor="middle" fill="#00897B">アクセストークン：OAuth</text>
+<text class="label" x="853" y="474" text-anchor="start" fill="#546E7A">この操作を許すか</text>
+<text class="label" x="1022" y="318" text-anchor="middle" fill="#E65100">G. 機械同士</text>
+<text class="label" x="1022" y="332" text-anchor="middle" fill="#E65100">mTLS・API キー・</text>
+<text class="label" x="1022" y="346" text-anchor="middle" fill="#E65100">クライアントクレデンシャル</text>
+
+<!-- ===== 凡例 ===== -->
+<rect x="20" y="700" width="1280" height="100" rx="6" fill="#FAFAFA" stroke="#E0E0E0"/>
+<text x="36" y="723" font-size="12" font-weight="700" fill="#424242">箱の色（役割）</text>
+<rect x="150" y="709" width="22" height="16" rx="3" fill="#FFFFFF" stroke="#757575" stroke-width="1.5"/>
+<text x="180" y="722" font-size="11.5" fill="#424242">利用者</text>
+<rect x="254.5" y="709" width="22" height="16" rx="3" fill="#E6F4EA" stroke="#2E7D32" stroke-width="1.5"/>
+<text x="284.5" y="722" font-size="11.5" fill="#424242">サーバー</text>
+<rect x="370.5" y="709" width="22" height="16" rx="3" fill="#F1E6F7" stroke="#7B1FA2" stroke-width="1.5"/>
+<text x="400.5" y="722" font-size="11.5" fill="#424242">名簿</text>
+<rect x="463.5" y="709" width="22" height="16" rx="3" fill="#ECEFF1" stroke="#546E7A" stroke-width="1.5"/>
+<text x="493.5" y="722" font-size="11.5" fill="#424242">アプリの中の判断</text>
+<text x="36" y="763" font-size="12" font-weight="700" fill="#424242">線（通信の種類）</text>
+<line x1="150" y1="759" x2="190" y2="759" stroke="#1E6FD9" stroke-width="2.5" marker-end="url(#arrow-web)"/>
+<text x="200" y="763" font-size="11.5" fill="#424242">利用者と IdP</text>
+<line x1="313.6" y1="759" x2="353.6" y2="759" stroke="#00897B" stroke-width="2.0" marker-end="url(#arrow-token)"/>
+<text x="363.6" y="763" font-size="11.5" fill="#424242">トークンで渡す</text>
+<line x1="484.1" y1="759" x2="524.1" y2="759" stroke="#7B1FA2" stroke-width="2.0" marker-end="url(#arrow-db)"/>
+<text x="534.1" y="763" font-size="11.5" fill="#424242">名簿を引く</text>
+<line x1="631.6" y1="759" x2="671.6" y2="759" stroke="#E65100" stroke-width="2.0" marker-end="url(#arrow-machine)"/>
+<text x="681.6" y="763" font-size="11.5" fill="#424242">サービス同士</text>
+<line x1="790.6" y1="759" x2="830.6" y2="759" stroke="#546E7A" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow-decide)"/>
+<text x="840.6" y="763" font-size="11.5" fill="#424242">判断を仰ぐ</text>
+<text x="1284" y="790" text-anchor="end" font-size="10.5" fill="#757575">FIDO2 は A、OAuth 2.0 は D（認証が欲しいなら C の OIDC）、LDAP は F</text>
+</svg>

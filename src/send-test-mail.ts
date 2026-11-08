@@ -11,7 +11,7 @@ if (!to) {
 const info = await transport.sendMail({
 	from,
 	to,
-	subject: 'sample-oci-vm-docker からのテスト',
+	subject: 'auth からのテスト',
 	text: `app VM のコンテナから mail VM を通して送りました（${new Date().toISOString()}）。`,
 });
 console.log(`sent: ${info.messageId} ${info.response}`);

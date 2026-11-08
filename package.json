@@ -1,5 +1,5 @@
 {
-  "name": "sample-oci-vm-docker",
+  "name": "auth",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
+    "argon2": "^0.45.2",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.16",
     "mysql2": "^3.24.6",

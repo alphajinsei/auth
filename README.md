@@ -1,31 +1,33 @@
-# sample-oci-vm-docker
+# auth
 
-方式③（OCI の共通基盤）のサンプル。Node.js + Hono + MySQL（HeatWave）+ Drizzle で作ったメモ帳の API を、共通基盤の Docker ホストにコンテナで載せる。②の [sample-cf-workers-d1](https://github.com/alphajinsei/sample-cf-workers-d1) と同じ API を、Workers + D1 から載せ替えたもの。
+既製品を使わずに自作する、認証・認可のサーバー（IdP）。パスワード、TOTP、パスキー（WebAuthn）でログインでき、OIDC と OAuth 2.0（認可コード + PKCE）でほかのアプリにログインの結果と権限を渡す。OCI の共通基盤（方式③）の Docker ホストに載る。
 
-- 公開先：https://sample-oci-vm-docker.alphajinsei.com
-- 載せている共通基盤：[oci-platform](https://github.com/alphajinsei/oci-platform)（手元では `~/claude-sandbox/oci-platform`）
-- 全体の方針と、どの方式でも共通の決まりごと：[サービス開発ガイド](https://github.com/alphajinsei/cf-infra-playbook/blob/main/docs/service-guide.md)（手元では `~/claude-sandbox/infra/docs/service-guide.md`）
-- 共通基盤の仕様（アプリが受け取るもの・守ること）、運用、困ったとき：[oci-platform の README](https://github.com/alphajinsei/oci-platform#readme)
+- 公開先：https://auth.alphajinsei.com
+- 設計：[docs/design.md](docs/design.md)、進め方と進捗：[docs/roadmap.md](docs/roadmap.md)、勉強メモ：[docs/notes/](docs/notes/)
+- 載せている共通基盤：[oci-platform](https://github.com/alphajinsei/oci-platform)。仕様（アプリが受け取るもの・守ること）、運用、困ったときは [その README](https://github.com/alphajinsei/oci-platform#readme)
+- テンプレートにしたサンプル：[sample-oci-vm-docker](https://github.com/alphajinsei/sample-oci-vm-docker)
 
-## 1. この方式の用途
+> 段0（準備）の時点。コードはまだテンプレートのメモ帳のままで、段1で置き換える。下の 2〜4 も、それまではテンプレートの説明のまま。
 
-向いているもの：Workers で動かないもの。常駐プロセス、WebSocket の常時接続、Node.js 専用のライブラリ、任意の言語、コンテナで配られている OSS、MySQL で動くもの。
+## 1. このサービスの用途
 
-向いていないもの：PostgreSQL や Redis が必須なもの（共通基盤にない。必要なら app にコンテナで置き、単一障害点として割り切る）、大きなファイルの配信（LB が 10Mbps）、HTTP 以外の通信。Workers で足りるものは②のほうが手間がない。
+自分のサービスのログインを1か所にまとめる。アプリは「auth でログイン」のボタン（OIDC）を置くだけで、どの方式でログインしたかを気にしない。
+
+同時に、認証・認可を学ぶための教材でもある。プロトコルの本質の部分は自分で書き、パースや暗号の計算そのものはライブラリに任せる。
 
 ## 2. 構成と主なファイル
 
 ```
 Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
-                                    |  backend set "sample-oci-vm-docker", health check /health
+                                    |  backend set "auth", health check /health
                                     v
-                            app VM :8001 --> container :3000 (src/index.ts, Hono on Node)
+                            app VM :8002 --> container :3000 (src/index.ts, Hono on Node)
                                                 |  DB_* from .env (password from Vault)
                                                 v
-                                     MySQL HeatWave: schema sample_oci_vm_docker
+                                     MySQL HeatWave: schema auth
 
 container --SMTP 25 (no login, inside the VCN)--> mail VM (Postfix) --> Email Delivery --> recipient
-          From: "sample-oci-vm-docker" <noreply@alphajinsei.com>
+          From: "auth" <noreply@alphajinsei.com>
 ```
 
 | ファイル | 役割 |
@@ -38,7 +40,7 @@ container --SMTP 25 (no login, inside the VCN)--> mail VM (Postfix) --> Email De
 | `src/migrate.ts` | マイグレーションを流す（デプロイのとき、コンテナの中で `node dist/migrate.js`） |
 | `migrations/` | drizzle-kit が作ったマイグレーションの SQL とスナップショット。手で書かない |
 | `Dockerfile` | ビルドして `dist/` を作り、実行用のイメージに入れる |
-| `compose.yaml` | 本番と手元で共通。ポートは `.env` の `APP_PORT`（本番は台帳の 8001） |
+| `compose.yaml` | 本番と手元で共通。ポートは `.env` の `APP_PORT`（本番は台帳の 8002） |
 | `compose.override.yaml` | 手元だけ（自動で重なる）。HeatWave と同じ版の MySQL のコンテナと、メールの受け口の Mailpit、その接続情報 |
 | `local.env` | `npm run dev` の接続情報（手元の MySQL。秘密情報ではない） |
 | `scripts/deploy.sh` | `npm run deploy`。ソースを app VM に送り、そこでビルドして入れ替える（`remote-deploy.sh` を VM で流す） |
@@ -63,7 +65,7 @@ curl -X DELETE http://localhost:3000/api/memos/1 -i
 本番と同じコンテナで確かめる：
 
 ```bash
-docker compose up -d --build                     # app も MySQL もコンテナ。http://localhost:8001
+docker compose up -d --build                     # app も MySQL もコンテナ。http://localhost:8002
 docker compose run --rm app node dist/migrate.js
 docker compose down                              # データは残る（消すなら down -v）
 ```
@@ -96,40 +98,16 @@ npm run db:init      # ops から、スキーマとユーザーを作る
 npm run deploy
 ```
 
-1. ソースを `oci-app:/opt/apps/sample-oci-vm-docker/` に rsync で送る（`node_modules`、`infra/`、手元用のファイルは送らない）
+1. ソースを `oci-app:/opt/apps/auth/` に rsync で送る（`node_modules`、`infra/`、手元用のファイルは送らない）
 2. app VM の上で：`.env` を書く（DB のパスワードは `platform-secret` で Vault から。メールの送り先は共通基盤の出力 `smtp`） → 今のイメージを `:previous` として残す → `docker compose build`（arm64 でそのままビルド） → マイグレーション → `docker compose up -d` → `/health` が返るまで待つ
 
-マイグレーションが失敗したら、コンテナは入れ替わらない。戻すときは、app VM で `docker tag sample-oci-vm-docker:previous sample-oci-vm-docker:latest && docker compose up -d`（マイグレーションは戻らない）。
+マイグレーションが失敗したら、コンテナは入れ替わらない。戻すときは、app VM で `docker tag auth:previous auth:latest && docker compose up -d`（マイグレーションは戻らない）。
 
-## 5. このサンプルから新しいサービスを始める
+## 5. このサービスを使う
 
-GitHub の Template repository にしてあるので、履歴なしでコピーできる。`<name>` は新しいサービスの名前（＝フォルダ名 ＝ リポジトリ名 ＝ サブドメイン）。
+アプリから使う（段4で作る）：管理用のコマンドでクライアントを登録し、`https://auth.alphajinsei.com/.well-known/openid-configuration` を OIDC のライブラリに渡す。例は demo-app（段4で作る）。
 
-```bash
-cd ~/claude-sandbox
-gh repo create <name> --template alphajinsei/sample-oci-vm-docker --public --clone
-cd <name>
-npm install
-```
-
-書き換える場所：
-
-| ファイル | 書き換えるところ |
-| --- | --- |
-| `~/claude-sandbox/oci-platform/README.md` | ポートの台帳に1行足す（空いている番号を取る） |
-| `infra/terraform/main.tf` | `locals` の `name` と `port` |
-| `infra/terraform/versions.tf` | backend の `key`（`<name>/terraform.tfstate`）。変え忘れると、サンプルの state を上書きする |
-| `package.json` | `name` |
-| `compose.yaml` | `image`（`<name>:latest`）と、`APP_PORT` の既定値 |
-| `src/db/schema.ts` | メモのテーブルを、新しいサービスのテーブルに置き換える |
-| `migrations/` | フォルダごと消してから `npx drizzle-kit generate` で作り直す |
-| `src/index.ts` | メモの API を置き換える。`/health` は残す（LB が見る） |
-| `public/index.html` | 画面 |
-| `README.md` | このファイルを新しいサービスの説明に書き直す（見出しはそのまま） |
-
-書き換えたあとは、3 で手元で確かめ、4 の「初回だけ」と `npm run deploy`。
-
-- infra で Claude Code を開いて作業するなら、`~/claude-sandbox/infra/.claude/settings.json` の `additionalDirectories` に `~/claude-sandbox/<name>` を足す。
+利用者を作る（段1で作る）：app VM で `docker compose exec app node dist/admin.js create-user <名前>`。登録の画面はない。
 
 ## 6. この方式の注意点
 
