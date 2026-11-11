@@ -9,7 +9,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:init": "bash scripts/db-init.sh",
-    "deploy": "bash scripts/deploy.sh"
+    "deploy": "bash scripts/deploy.sh",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
