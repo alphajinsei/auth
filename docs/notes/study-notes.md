@@ -24,3 +24,5 @@
 ## ドキュメントの書き方
 
 - Mermaid のシーケンス図では、メッセージの中の `;` が文の区切りとして読まれ、構文エラーになる（`Set-Cookie: a=b; HttpOnly` など）。`#59;` と書く。
+- 失敗の回数は、1つの `UPDATE ... SET failed_count = failed_count + 1, locked_until = IF(failed_count >= 5, ...)` で数える。読んでから書くと、同時に来た失敗を数え漏らす。MySQL の `SET` は左から順に評価され、右の式は足したあとの値を見る。
+- 日時の9時間のずれ：Drizzle の insert・update は日時を UTC で送るが、生の SQL に埋めた `Date` は mysql2 が既定でプロセスの時刻（手元は JST）で文字列にする。接続に `timezone: 'Z'` を付けてそろえた。本番のコンテナは UTC なので、手元でしか出ない種類の不具合。

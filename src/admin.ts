@@ -52,11 +52,19 @@ async function createUser(username: string) {
 	console.log(`created user "${username}" (id ${id})`);
 }
 
+// 失敗の回数による一時停止を解く
+async function unlockUser(username: string) {
+	const [result] = await db.update(users).set({ failedCount: 0, lockedUntil: null }).where(eq(users.username, username));
+	if (result.affectedRows === 0) throw new Error(`user "${username}" not found`);
+	console.log(`unlocked user "${username}"`);
+}
+
 const [command, ...args] = process.argv.slice(2);
 try {
 	if (command === 'create-user' && args[0]) await createUser(args[0]);
+	else if (command === 'unlock' && args[0]) await unlockUser(args[0]);
 	else {
-		console.error('usage: admin create-user <username>');
+		console.error('usage: admin create-user <username> | admin unlock <username>');
 		process.exitCode = 1;
 	}
 } catch (e) {
