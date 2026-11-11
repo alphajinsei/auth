@@ -1,9 +1,9 @@
-# app VM の上で動く（deploy.sh が rsync で送り、ssh で実行する）。引数：DIR PORT DB_HOST DB_NAME DB_USER DB_PASSWORD_SECRET SMTP_HOST SMTP_PORT SMTP_TLS_NAME MAIL_FROM
+# app VM の上で動く（deploy.sh が rsync で送り、ssh で実行する）。引数：DIR PORT DB_HOST DB_NAME DB_USER DB_PASSWORD_SECRET SMTP_HOST SMTP_PORT SMTP_TLS_NAME MAIL_FROM TOTP_KEY_SECRET
 set -euo pipefail
 DIR=$1 PORT=$2
 cd "$DIR"
 
-# 接続情報を .env に書く。パスワードは Vault から（インスタンス・プリンシパル）
+# 接続情報を .env に書く。パスワードと TOTP の鍵は Vault から（インスタンス・プリンシパル）
 umask 077
 cat > .env <<ENV
 APP_PORT=$PORT
@@ -15,6 +15,7 @@ SMTP_HOST=$7
 SMTP_PORT=$8
 SMTP_TLS_NAME=$9
 MAIL_FROM=${10}
+TOTP_KEY=$(platform-secret "${11}")
 ENV
 
 # 今のイメージを previous として残す（戻すときは docker tag <name>:previous <name>:latest → up -d）

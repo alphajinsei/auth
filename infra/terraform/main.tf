@@ -95,3 +95,24 @@ resource "oci_vault_secret" "db_password" {
     content      = base64encode(random_password.db.result)
   }
 }
+
+# ---- TOTP の秘密を暗号化する鍵（AES-256 の 32バイト）：Terraform が作って Vault に入れる。app VM が Vault から読む ----
+# DB のパスワードと同じ経路。デプロイのときに .env の TOTP_KEY に書かれる（src/secretbox.ts）。
+# 作り直すと、DB に入っている TOTP の秘密が全部読めなくなる（全員が TOTP を登録し直し）。-replace しない
+
+resource "random_bytes" "totp_key" {
+  length = 32
+}
+
+resource "oci_vault_secret" "totp_key" {
+  compartment_id = local.platform.compartment_id
+  vault_id       = local.platform.vault_id
+  key_id         = local.platform.vault_key_id
+  secret_name    = "${local.name}-totp-key"
+  description    = "AES-256 key (base64) that encrypts TOTP secrets in the DB"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(random_bytes.totp_key.base64) # 中身は「鍵の base64 の文字列」。platform-secret はそれを返す
+  }
+}

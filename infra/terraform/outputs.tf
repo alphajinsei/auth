@@ -33,3 +33,7 @@ output "smtp" {
   value = local.platform.smtp
 }
 
+
+output "totp_key_secret" {
+  value = oci_vault_secret.totp_key.secret_name
+}
