@@ -22,3 +22,17 @@ export const sessions = mysqlTable('sessions', {
 	expiresAt: datetime('expires_at').notNull(),
 	createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+// 利用者に登録した TOTP（1人に1つ）。アカウント（users）とは分け、「登録した認証の手段」として持つ
+export const totpCredentials = mysqlTable('totp_credentials', {
+	userId: varchar('user_id', { length: 36 })
+		.primaryKey()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	// 秘密（20バイト）を AES-256-GCM で暗号化したもの（src/secretbox.ts）
+	secret: varchar('secret', { length: 255 }).notNull(),
+	// 確認の6桁が通った時刻。空なら確認待ち（まだログインには使わない）
+	confirmedAt: datetime('confirmed_at'),
+	// 最後に通った時刻の枠の番号。これ以前の枠は拒む（同じ6桁の再利用の防止）
+	lastStep: int('last_step'),
+	createdAt: timestamp('created_at').notNull().defaultNow(),
+});

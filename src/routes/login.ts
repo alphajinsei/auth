@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '../db/client.js';
-import { users } from '../db/schema.js';
+import { totpCredentials, users } from '../db/schema.js';
 import { hashPassword, verifyPassword } from '../password.js';
 import { currentUser, endSession, startSession } from '../session.js';
 import { accountPage, loginPage } from '../views.js';
@@ -73,7 +73,11 @@ login.post('/login', async (c) => {
 login.get('/account', async (c) => {
 	const user = await currentUser(c);
 	if (!user) return c.redirect('/login', 303);
-	return c.html(accountPage(user.username));
+	// 登録した TOTP の状態（行がない／確認待ち／有効）
+	const [cred] = await db.select().from(totpCredentials).where(eq(totpCredentials.userId, user.id));
+	const totp = !cred ? 'none' : cred.confirmedAt ? 'enabled' : 'pending';
+	const notices: Record<string, string> = { enabled: 'TOTP を有効にしました', deleted: 'TOTP を削除しました' };
+	return c.html(accountPage(user.username, totp, notices[c.req.query('totp') ?? '']));
 });
 
 // GET にしない：<img src=".../logout"> を置くだけで、よそのサイトから勝手にログアウトさせられるため

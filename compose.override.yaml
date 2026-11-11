@@ -4,6 +4,7 @@ services:
   app:
     environment:
       PUBLIC_ORIGIN: http://localhost:8002
+      TOTP_KEY: YZ0+7XAkxTsSNT8U2DbuThm9zngneIaJ4R4dTH4BbK8= # 手元の開発用
       DB_HOST: mysql
       DB_USER: app
       DB_PASSWORD: app

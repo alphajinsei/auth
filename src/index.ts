@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { db, pool } from './db/client.js';
 import { checkOrigin } from './origin.js';
 import { login } from './routes/login.js';
+import { totp } from './routes/totp.js';
 
 // 外から見た自分の origin（本番 https://auth.alphajinsei.com、手元 http://localhost:3000）。
 // リクエストの URL からは決めない：LB で TLS が終わるので、アプリには http で届く
@@ -29,6 +30,7 @@ app.get('/api/health', async (c) => {
 
 app.get('/', (c) => c.redirect('/account', 303));
 app.route('/', login);
+app.route('/', totp);
 
 app.use('/*', serveStatic({ root: './public' }));
 

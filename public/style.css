@@ -5,3 +5,7 @@ label { display: block; margin-bottom: 16px; font-size: .9rem; }
 input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 8px; font-size: 1rem; }
 button { width: 100%; padding: 10px; font-size: 1rem; cursor: pointer; }
 .error { color: #b3261e; background: #fdecea; padding: 8px; border-radius: 4px; }
+h2 { font-size: 1.05rem; margin-top: 28px; }
+.notice { color: #1b5e20; background: #e8f5e9; padding: 8px; border-radius: 4px; }
+button.secondary { background: #fff; border: 1px solid #999; }
+code { word-break: break-all; }

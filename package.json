@@ -18,11 +18,13 @@
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.16",
     "mysql2": "^3.24.6",
-    "nodemailer": "^10.3.1"
+    "nodemailer": "^10.3.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
     "@types/nodemailer": "^8.0.2",
+    "@types/qrcode": "^1.5.6",
     "drizzle-kit": "^0.31.11",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
