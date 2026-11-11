@@ -31,12 +31,16 @@ export const loginPage = (error?: string, username = '') =>
 
 export type TotpStatus = 'none' | 'pending' | 'enabled';
 
-export const accountPage = (username: string, totp: TotpStatus, notice?: string) =>
+// amr の値（RFC 8176）を、画面に出す言葉にする
+const amrLabel: Record<string, string> = { pwd: 'パスワード', otp: 'TOTP（ワンタイムパスワード）' };
+
+export const accountPage = (username: string, amr: string, totp: TotpStatus, notice?: string) =>
 	layout(
 		'アカウント',
 		html`
     ${notice ? html`<p class="notice">${notice}</p>` : ''}
     <p>ログイン中：<strong>${username}</strong></p>
+    <p>このセッションのログイン方法：${amr.split(' ').map((m) => amrLabel[m] ?? m).join(' + ')}（amr: <code>${amr}</code>）</p>
 
     <h2>2段階認証（TOTP）</h2>
     ${totp === 'enabled'
@@ -48,6 +52,19 @@ export const accountPage = (username: string, totp: TotpStatus, notice?: string)
     <h2>ログアウト</h2>
     <form method="post" action="/logout">
       <button class="secondary">ログアウト</button>
+    </form>`,
+	);
+
+// ログインの2段目。パスワードが通ったあと、認証アプリの6桁を求める
+export const totpLoginPage = (error?: string) =>
+	layout(
+		'2段階認証',
+		html`
+    ${error ? html`<p class="error">${error}</p>` : ''}
+    <p>認証アプリに出ている6桁を入れてください。</p>
+    <form method="post" action="/login/totp">
+      <label>6桁 <input name="code" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" required autofocus></label>
+      <button>ログイン</button>
     </form>`,
 	);
 

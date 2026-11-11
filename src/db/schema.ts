@@ -20,6 +20,10 @@ export const sessions = mysqlTable('sessions', {
 		.notNull()
 		.references(() => users.id, { onDelete: 'cascade' }),
 	expiresAt: datetime('expires_at').notNull(),
+	// password：パスワードまで済んだ仮のセッション（6桁を待っている）。full：本物のセッション
+	stage: varchar('stage', { length: 16 }).notNull().default('full'),
+	// このログインで実際に使った認証の方式（OIDC の amr と同じ値。RFC 8176）。空白区切り。例：'pwd'、'pwd otp'
+	amr: varchar('amr', { length: 64 }).notNull().default('pwd'),
 	createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 

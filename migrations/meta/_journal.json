@@ -15,6 +15,13 @@
       "when": 1794420621352,
       "tag": "0001_totp",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1794422276708,
+      "tag": "0002_session_stage_amr",
+      "breakpoints": true
     }
   ]
 }
