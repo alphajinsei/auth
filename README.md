@@ -7,7 +7,7 @@
 - 載せている共通基盤：[oci-platform](https://github.com/alphajinsei/oci-platform)。仕様（アプリが受け取るもの・守ること）、運用、困ったときは [その README](https://github.com/alphajinsei/oci-platform#readme)
 - テンプレートにしたサンプル：[sample-oci-vm-docker](https://github.com/alphajinsei/sample-oci-vm-docker)
 
-> 段0（準備）の時点。コードはまだテンプレートのメモ帳のままで、段1で置き換える。下の 2〜4 も、それまではテンプレートの説明のまま。
+> 段1（パスワードでのログインとセッション）まで。進み具合は [ロードマップ](docs/roadmap.md)。
 
 ## 1. このサービスの用途
 
@@ -26,15 +26,21 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
                                                 v
                                      MySQL HeatWave: schema auth
 
-container --SMTP 25 (no login, inside the VCN)--> mail VM (Postfix) --> Email Delivery --> recipient
-          From: "auth" <noreply@alphajinsei.com>
 ```
+
+登場人物の関係（ブラウザ、demo-app、認証器）は [設計](docs/design.md) の図。メールの送信（テンプレートの `src/mail.ts`）は、まだ使っていない。
 
 | ファイル | 役割 |
 | --- | --- |
-| `src/index.ts` | アプリ本体（Hono）。`GET /health`（LB 用。DB を見ない）、`GET /api/health`（DB まで見る）、`GET/POST /api/memos`、`DELETE /api/memos/:id`。`public/` の静的ファイルも返す |
+| `src/index.ts` | 入口（Hono）。POST の `Origin` の確認、`Cache-Control: no-store`、`GET /health`（LB 用。DB を見ない）、`GET /api/health`（DB まで見る）。`PUBLIC_ORIGIN`（外から見た自分の origin）が必須 |
+| `src/routes/login.ts` | `GET/POST /login`、`GET /account`、`POST /logout`。失敗の回数による一時停止と、監査ログ（標準出力の JSON） |
+| `src/session.ts` | サーバー側のセッション。Cookie `__Host-session` に乱数の ID、DB にその SHA-256 |
+| `src/password.ts` | パスワードのハッシュと照合（Argon2id） |
+| `src/origin.ts` | CSRF の対策（`Origin` ヘッダーの確認） |
+| `src/views.ts` | 画面の HTML |
+| `src/admin.ts` | 管理用のコマンド：`create-user <名前>`（パスワードは画面に出さずに読む）、`unlock <名前>` |
 | `src/db/schema.ts` | テーブル定義の唯一の正（Drizzle、MySQL） |
-| `src/db/client.ts` | DB の接続（環境変数 `DB_HOST` など） |
+| `src/db/client.ts` | DB の接続（環境変数 `DB_HOST` など）。日時は UTC で読み書きする（`timezone: 'Z'`） |
 | `src/mail.ts` | メールの送信（nodemailer）。送り先は環境変数 `SMTP_HOST` など、差出人は `MAIL_FROM`（共通基盤の `noreply@`）に表示名を付ける |
 | `src/send-test-mail.ts` | 試しに1通送る（`node dist/send-test-mail.js <宛先>`）。誰でも送らせられる口になるので、Web の API にはしない |
 | `src/migrate.ts` | マイグレーションを流す（デプロイのとき、コンテナの中で `node dist/migrate.js`） |
@@ -57,10 +63,10 @@ npm run dev                    # http://localhost:3000
 ```
 
 ```bash
-curl http://localhost:3000/api/memos
-curl -X POST http://localhost:3000/api/memos -H "Content-Type: application/json" -d '{"text":"はじめてのメモ"}'
-curl -X DELETE http://localhost:3000/api/memos/1 -i
+echo 'correct-horse-battery' | npx tsx --env-file=local.env src/admin.ts create-user alice   # 手元の仮の利用者
 ```
+
+http://localhost:3000 を開き、上の利用者でログインする。ポートを変えるときは `PORT=3001 PUBLIC_ORIGIN=http://localhost:3001 npm run dev`（`PUBLIC_ORIGIN` が違うと、POST が 403 になる）。
 
 本番と同じコンテナで確かめる：
 
@@ -71,7 +77,7 @@ docker compose down                              # データは残る（消す�
 ```
 
 - 手元で送ったメールを見る：`docker compose up -d mailpit` → `npx tsx --env-file=local.env src/send-test-mail.ts you@example.com` → http://localhost:8025（外へは出ない）
-- 手元の DB の中身を見る：`docker compose exec mysql mysql -u app -papp app -e 'SELECT * FROM memos'`
+- 手元の DB の中身を見る：`docker compose exec mysql mysql -u app -papp app -e 'SELECT username, failed_count, locked_until FROM users'`
 
 ### テーブルを変える
 

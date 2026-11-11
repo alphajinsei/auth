@@ -32,7 +32,7 @@
 - [x] 1-a：メモの API を取り除き、利用者とセッションのテーブルを作る。管理用のコマンドで利用者を作る（Argon2id）
 - [x] 1-b：ログイン画面、セッションの Cookie、ログアウト
 - [x] 1-c：失敗の回数による一時停止
-- [ ] 共通基盤に初めて載せる（`./tf.sh apply`、`npm run db:init`、`npm run deploy`）
+- [x] 1-d：共通基盤に初めて載せる（`./tf.sh apply`、`npm run db:init`、`npm run deploy`）
 
 ## 段2：TOTP（A）
 
