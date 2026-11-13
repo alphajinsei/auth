@@ -697,3 +697,9 @@ Cookie を盗まれる問題への次の手として、セッションも端末�
 と、名前も層も違う。分かりにくさの原因は推察のとおり、**「RP」という言葉が層によって別のものを指す**こと。元のアプリから見ると、パスキーは「認証サーバーの中の出来事」で、アプリのドメインは一切登場しない。
 
 **理解の確認**：RP は「証明を信じる側」。WebAuthn では認証サーバーが認証器を信じる側なので、RP ID は認証サーバーの FQDN。元の Web アプリは OIDC の層の RP で、そちらは client_id で識別される。
+
+**裏付け**：WebAuthn の仕様（W3C、Level 3）の用語の節に、この点そのものの注記がある。
+
+> Note: While the term Relying Party is also often used in other contexts (e.g., X.509 and OAuth), an entity acting as a Relying Party in one context is not necessarily a Relying Party in other contexts. … Note that in any concrete instantiation a WebAuthn context may be embedded in a broader overall context, e.g., one based on OAuth.
+
+（ある文脈で RP である者が、ほかの文脈でも RP とは限らない。WebAuthn の文脈は、OAuth のような大きな文脈の中に埋め込まれることがある。）また RP ID の定義には「既定では、WebAuthn を呼び出したページの origin のドメイン」とある。「Google でログイン」で `navigator.credentials` を呼ぶのは Google のログイン画面なので、RP ID は Google のドメインになる。出典：[Web Authentication Level 3 の Terminology](https://www.w3.org/TR/webauthn-3/#webauthn-relying-party)
