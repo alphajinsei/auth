@@ -26,13 +26,22 @@ export const loginPage = (error?: string, username = '') =>
       <label>ユーザー名 <input name="username" value="${username}" autocomplete="username" required autofocus></label>
       <label>パスワード <input name="password" type="password" autocomplete="current-password" required></label>
       <button>パスワードでログイン</button>
-    </form>`,
+    </form>
+    <p class="or">または</p>
+    <button id="passkey-login" type="button">パスキーでログイン</button>
+    <p id="passkey-message" class="error-text"></p>
+    <script src="/passkey-login.js" defer></script>`,
 	);
 
 export type TotpStatus = 'none' | 'pending' | 'enabled';
 
 // amr の値（RFC 8176）を、画面に出す言葉にする
-const amrLabel: Record<string, string> = { pwd: 'パスワード', otp: 'TOTP（ワンタイムパスワード）' };
+const amrLabel: Record<string, string> = {
+	pwd: 'パスワード',
+	otp: 'TOTP（ワンタイムパスワード）',
+	swk: 'パスキー（同期される鍵）',
+	hwk: 'パスキー（端末に固定の鍵）',
+};
 
 export type PasskeyRow = { name: string; createdAt: Date; lastUsedAt: Date | null };
 
@@ -67,7 +76,7 @@ export const accountPage = (username: string, amr: string, totp: TotpStatus, pas
       <button>パスキーを登録</button>
     </form>
     <p id="passkey-message" class="error-text"></p>
-    <script src="/passkey.js" defer></script>
+    <script src="/passkey-register.js" defer></script>
 
     <h2>ログアウト</h2>
     <form method="post" action="/logout">

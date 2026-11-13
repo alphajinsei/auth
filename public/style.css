@@ -12,3 +12,4 @@ code { word-break: break-all; }
 .error-text { color: #b3261e; }
 ul.passkeys { padding-left: 1.2em; }
 ul.passkeys li { margin-bottom: 8px; }
+.or { text-align: center; color: #666; margin: 16px 0; }

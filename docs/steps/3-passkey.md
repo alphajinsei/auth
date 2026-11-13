@@ -44,6 +44,33 @@ FIDO のシーケンスは、次の7つの要素の組み合わせで説明で�
 | WebAuthn（段3） | 認証器 | 署名（assertion） | auth |
 | OIDC（段4） | auth（OP） | ID トークン | demo-app |
 
+### 「WebAuthn を呼び出す」と origin
+
+**WebAuthn を呼び出す**とは、ページの JavaScript が、ブラウザの API（`navigator.credentials.create()` / `get()`）を呼ぶこと。端末の中の関数の呼び出しで、ネットワークの通信ではない。その先で、ブラウザが認証器に鍵の作成や署名を頼む。
+
+「呼び出す」と聞くと、クライアントからサーバーへの呼び出しを思い浮かべやすいが、そうではない。サーバー（auth）は、呼び出すコード（`public/passkey-register.js`）と材料（options）を配るだけで、呼ぶのはブラウザの中で動くそのコード。
+
+| 言葉 | 何で決まるか | auth では |
+| --- | --- | --- |
+| **呼び出したページ** | `navigator.credentials` を呼んだ JavaScript を載せているページ（HTML） | `https://auth.alphajinsei.com/account` など、auth のページ |
+| **origin** | そのページの URL（アドレスバー）のスキーム + ホスト + ポート。JS のファイルをどこから読み込んだかではない（CDN から読み込んだ JS でも、載せたページの origin になる） | `https://auth.alphajinsei.com` |
+| **RP ID** | 既定では origin のドメイン。親のドメインまでは指定できる | `auth.alphajinsei.com` |
+
+偽サイトは自分のページの URL を偽れないので、origin も偽れない。ブラウザが origin を clientDataJSON に書き込み、それが署名の対象に入る（要素③）。
+
+「Google でログイン」に当てはめると、元のアプリのページは呼び出したページではない。リダイレクトで Google のログイン画面に移ってから、その画面の JavaScript が `navigator.credentials.get()` を呼ぶ。だから origin も RP ID も Google のもので、元のアプリのドメインはパスキーに一切登場しない。
+
+```
+1. app.example.com のページで「Google でログイン」を押す
+2. リダイレクトで、ブラウザが accounts.google.com のページに移る（元のアプリのページは、もう画面にない）
+3. accounts.google.com のページの JavaScript が navigator.credentials.get() を呼ぶ ← 呼び出したページ
+   → ブラウザが origin = https://accounts.google.com を記録し、認証器が署名する
+4. その署名を、Google のサーバーが検証する（RP サーバー）
+5. リダイレクトで app.example.com に戻る（OIDC の層。段4）
+```
+
+### ブラウザを信じる範囲と、RP の分け方
+
 ブラウザと認証器の間（CTAP、または OS の内部）は、サーバーからは見えない。サーバーがやりとりするのは、ブラウザの JavaScript だけ。
 
 **ブラウザは信じる前提**。origin を正しく書くこと、RP ID がページのドメインと合うか確かめることは、ブラウザ（と OS）に任せている。攻撃者が自分で細工したブラウザを作っても、被害者の秘密鍵がないので署名できない。破れるのは被害者のブラウザ自体が乗っ取られたときだけで、それはパスワードでも Cookie でも守れない範囲として、FIDO の対象外にしている。サーバーは、署名・challenge・origin・RP ID のハッシュをすべて自分で確かめる。
@@ -87,17 +114,17 @@ sequenceDiagram
 
 | 手順 | 図の中身 | コード |
 | --- | --- | --- |
-| 登録 1 | 「パスキーを登録」を押す | [public/passkey.js](../../public/passkey.js) の `submit` |
+| 登録 1 | 「パスキーを登録」を押す | [public/passkey-register.js](../../public/passkey-register.js) の `submit` |
 | 登録 2 | POST /account/passkey/options | [src/routes/passkey.ts](../../src/routes/passkey.ts) の `POST /account/passkey/options`（ログイン中か＝要素⑥） |
 | 登録 2 のあとの Note | challenge を作り、覚える | 同じファイルの `issueChallenge`、[src/webauthn.ts](../../src/webauthn.ts) の `newChallenge` |
 | 登録 3 | options を返す | `src/webauthn.ts` の `registrationOptions` |
-| 登録 4〜6 | 認証器が鍵ペアを作る | `public/passkey.js` の `navigator.credentials.create`。中身はブラウザと OS（コードはない） |
-| 登録 6 のあとの Note | clientDataJSON を作る | ブラウザ。`public/passkey.js` の `credential.toJSON()` がまとめる |
+| 登録 4〜6 | 認証器が鍵ペアを作る | `public/passkey-register.js` の `navigator.credentials.create`。中身はブラウザと OS（コードはない） |
+| 登録 6 のあとの Note | clientDataJSON を作る | ブラウザ。`public/passkey-register.js` の `credential.toJSON()` がまとめる |
 | 登録 7 | POST /account/passkey/verify | `src/routes/passkey.ts` の `POST /account/passkey/verify`。最初に `takeChallenge`（取り出して消す） |
 | 登録 7 のあとの 1つ目の Note | 種類・challenge・origin | `src/webauthn.ts` の `checkClientData`（要素②③） |
 | 登録 7 のあとの 2つ目の Note | 分解、RP ID のハッシュとフラグ | `src/webauthn.ts` の `verifyRegistration` → `checkAuthData`（要素④⑤）、`coseToKey`（要素①） |
 | 登録 8 | 鍵の ID、公開鍵、カウンタを保存 | `src/routes/passkey.ts` の `db.insert(webauthnCredentials)` |
-| 登録 9 | 「パスキーを登録しました」 | `src/routes/passkey.ts` の `c.json({ ok: true })` → `public/passkey.js` が `/account?passkey=registered` へ |
+| 登録 9 | 「パスキーを登録しました」 | `src/routes/passkey.ts` の `c.json({ ok: true })` → `public/passkey-register.js` が `/account?passkey=registered` へ |
 
 ### ログイン（パスワードなし）
 
@@ -136,7 +163,34 @@ sequenceDiagram
 - ユーザー検証（指紋・PIN）を済ませた鍵なので、パスキー1つで多要素になる。TOTP は求めない。
 - 段2と同じく、利用者がいない鍵の ID、署名違い、などの理由は、画面には同じことしか出さず、監査ログにだけ残す。
 
-図「ログイン」とコードの対応の表は、3-b を作るときに足す。
+#### 図「ログイン」とコードの対応
+
+| 手順 | 図の中身 | コード |
+| --- | --- | --- |
+| ログイン 1 | 「パスキーでログイン」を押す | [public/passkey-login.js](../../public/passkey-login.js) の `click` |
+| ログイン 2 | POST /login/passkey/options | [src/routes/passkey.ts](../../src/routes/passkey.ts) の `POST /login/passkey/options`（ログインしていなくてよい） |
+| ログイン 2 のあとの Note | challenge を作り、短命の Cookie に結び付ける | 同じファイルの `issueChallenge`（利用者には結び付けない）、[src/webauthn.ts](../../src/webauthn.ts) の `newChallenge` |
+| ログイン 3 | options を返す（鍵の一覧なし） | `src/webauthn.ts` の `authenticationOptions` |
+| ログイン 4〜6 | 認証器が鍵を選ばせ、指紋・PIN のあとで署名する | `public/passkey-login.js` の `navigator.credentials.get`。中身はブラウザと OS |
+| ログイン 6 のあとの Note | clientDataJSON を作る | ブラウザ。`credential.toJSON()` がまとめる |
+| ログイン 7 | POST /login/passkey/verify | `src/routes/passkey.ts` の `POST /login/passkey/verify`。最初に `takeChallenge`（取り出して消す） |
+| ログイン 8 | 鍵の ID から公開鍵・カウンタ・利用者を引く | 同じルートの `db.select(...).from(webauthnCredentials)` |
+| ログイン 8 のあとの 1つ目の Note | 種類・challenge・origin | `src/webauthn.ts` の `verifyAuthentication` → `checkClientData`（要素②③） |
+| ログイン 8 のあとの 2つ目の Note | RP ID のハッシュとフラグ | `verifyAuthentication` → `checkAuthData`（要素④⑤）。続けて user handle が鍵の持ち主か |
+| ログイン 8 のあとの 3つ目の Note | 公開鍵で署名を検証する | `verifyAuthentication` の `coseToKey` と `crypto.verify`（要素①） |
+| ログイン 8 のあとの 4つ目の Note | カウンタが増えているか | `verifyAuthentication` の最後（要素⑦） |
+| ログイン 9 | カウンタを更新、セッションを記録 | `src/routes/passkey.ts` の `db.update(webauthnCredentials)` と `startSession(..., 'full', 'hwk' か 'swk')` |
+| ログイン 10 | Set-Cookie、/account へ | `startSession` が Cookie を付け、`public/passkey-login.js` が `/account` へ移る |
+
+**challenge と鍵の ID は、別々の役目で照らす。**サーバーは2つのものを引く。
+
+- Cookie の引換券から引くのは「このブラウザに出した challenge」（ログイン 7 の `takeChallenge`）。
+- 鍵の ID から引くのは、登録で預かった公開鍵（ログイン 8）。
+
+そのうえで、届いた authenticatorData と clientDataJSON から署名の原文を組み立て、その公開鍵で検証する（3つ目の Note）。clientDataJSON の中の challenge は、1つ目の Note で、引いた challenge と比べてある。原文に challenge が入っているので、署名が正しければ「この鍵の持ち主が、今回の challenge に応えた」と言える。
+
+- パスワードの失敗による一時停止（段1-c）は、パスキーのログインでは見ない。あれはパスワードの総当たりを遅くするためのもので、パスキーは総当たりできない。
+- `amr` は、同期される鍵（authenticatorData の BE フラグが立つ）なら `swk`、端末に固定の鍵なら `hwk`（RFC 8176）。ユーザー検証（指紋・PIN）の分をどう表すかは 3-c で決める。
 
 ## 4. 自分で書くところ、ライブラリに任せるところ
 

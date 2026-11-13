@@ -6,7 +6,7 @@
 //   「ログイン 7」＝ 図「ログイン」の 7 番の矢印
 //   「要素③」   ＝ 「1. 技術の要素」の表の ③
 // どの関数が図のどこに当たるかの一覧は、文書の各図の下の「図とコードの対応」の表
-import { createHash, createPublicKey, randomBytes, type KeyObject } from 'node:crypto';
+import { createHash, createPublicKey, randomBytes, verify, type KeyObject } from 'node:crypto';
 import { decodeAttestationObject, decodeCredentialPublicKey, parseAuthenticatorData } from '@simplewebauthn/server/helpers';
 
 // RP ID：鍵を結び付けるドメイン（要素④）。自分の origin のホスト名（本番 auth.alphajinsei.com、手元 localhost）
@@ -101,6 +101,49 @@ export function verifyRegistration(body: any, challenge: string) {
 		signCount: auth.counter, // 要素⑦
 		transports: Array.isArray(body.response.transports) ? body.response.transports.join(' ') : null,
 	};
+}
+
+// ログイン 3：options の中身。ブラウザは PublicKeyCredential.parseRequestOptionsFromJSON でこれを読む
+// allowCredentials（鍵の一覧）は渡さない：discoverable なので、認証器がこの RP ID の鍵を自分で探す（ユーザー名が要らない）
+export function authenticationOptions(challenge: string) {
+	return { rpId, challenge, timeout: 5 * 60 * 1000, userVerification: 'required' };
+}
+
+// ログイン 8 のあとの Note 4つ：ブラウザから返ってきたログインの応答を確かめる。
+// stored は、ログイン 8 で鍵の ID から引いた行（登録 8 で保存したもの）
+export function verifyAuthentication(
+	body: any,
+	challenge: string,
+	stored: { userId: string; publicKey: string; signCount: number },
+) {
+	if (body?.type !== 'public-key') throw new Error('bad credential type');
+	const r = body.response;
+
+	// 1つ目の Note：種類・challenge・origin（要素②③）。戻り値は clientDataJSON のバイト列そのもの
+	const clientData = checkClientData(r.clientDataJSON, 'webauthn.get', challenge);
+
+	// 2つ目の Note：RP ID のハッシュとフラグ（要素④⑤）
+	const authData = Buffer.from(r.authenticatorData, 'base64url');
+	const auth = checkAuthData(authData);
+
+	// 認証器が返してきた利用者の ID（user handle）が、鍵の持ち主と同じか。discoverable の鍵は必ず返してくる
+	if (r.userHandle !== b64url(Buffer.from(stored.userId))) throw new Error('userHandle mismatch');
+
+	// 3つ目の Note（ここが本体。要素①）：保存した公開鍵で署名を検証する。
+	// 認証器が署名した原文は authenticatorData ‖ SHA-256(clientDataJSON)。サーバーは、届いた2つから同じ原文を組み立てる。
+	// clientDataJSON には challenge と origin が入っているので、それらも署名で守られる
+	const signed = Buffer.concat([authData, sha256(clientData)]);
+	const { key } = coseToKey(Buffer.from(stored.publicKey, 'base64url'));
+	// ES256 の署名は DER（ASN.1）の形で来る。Node.js の verify の既定と同じなので、そのまま渡せる
+	if (!verify('sha256', signed, key, Buffer.from(r.signature, 'base64url'))) throw new Error('bad signature');
+
+	// 4つ目の Note：カウンタ（要素⑦）。どちらかが 0 でなければ、増えていなければならない（同期されるパスキーは 0 のまま）
+	if ((auth.counter !== 0 || stored.signCount !== 0) && auth.counter <= stored.signCount) {
+		throw new Error(`counter did not increase: ${stored.signCount} -> ${auth.counter}`);
+	}
+
+	// BE（backup eligible）：鍵が同期される種類か。amr を分けるのに使う
+	return { signCount: auth.counter, synced: auth.flags.be };
 }
 
 // 登録 7 のあとの 2つ目の Note（登録の時点の確認）／ ログイン 8 のあとの 3つ目の Note（署名の検証）で使う。

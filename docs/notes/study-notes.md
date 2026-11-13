@@ -703,3 +703,107 @@ Cookie を盗まれる問題への次の手として、セッションも端末�
 > Note: While the term Relying Party is also often used in other contexts (e.g., X.509 and OAuth), an entity acting as a Relying Party in one context is not necessarily a Relying Party in other contexts. … Note that in any concrete instantiation a WebAuthn context may be embedded in a broader overall context, e.g., one based on OAuth.
 
 （ある文脈で RP である者が、ほかの文脈でも RP とは限らない。WebAuthn の文脈は、OAuth のような大きな文脈の中に埋め込まれることがある。）また RP ID の定義には「既定では、WebAuthn を呼び出したページの origin のドメイン」とある。「Google でログイン」で `navigator.credentials` を呼ぶのは Google のログイン画面なので、RP ID は Google のドメインになる。出典：[Web Authentication Level 3 の Terminology](https://www.w3.org/TR/webauthn-3/#webauthn-relying-party)
+
+### Q. 「既定では、RP ID は WebAuthn を呼び出したページの origin のドメイン」とあるが、呼び出したページと聞くと、Google に認証を頼む元の Web アプリを思い浮かべてしまう。そうではなく、Google の認証ページが、裏にある Google の認証ロジック（これが WebAuthn？）を呼んでいる、という見方をすればよいのか
+
+少し違う。**WebAuthn は Google の裏のロジックではなく、ブラウザが持つ JavaScript の API**（`navigator.credentials.create()` / `get()`）。「呼び出したページ」は、**その API を自分の JavaScript で呼んだページ**で、「Google でログイン」なら Google のログイン画面。
+
+```
+1. app.example.com のページで「Google でログイン」を押す
+2. リダイレクトで、ブラウザが accounts.google.com のページに移る   ← 元のアプリのページは、もう画面にない
+3. accounts.google.com のページの JavaScript が navigator.credentials.get() を呼ぶ   ← 「WebAuthn を呼び出したページ」
+   → ブラウザが origin = https://accounts.google.com を記録し、認証器が署名する
+4. その署名を、Google のサーバーが検証する（RP サーバー）
+5. リダイレクトで app.example.com に戻る（認可コードを持って）
+```
+
+元のアプリのページは、3 の時点で画面から消えているので、API を呼べない。だから RP ID も origin も Google のものになる。「RP ID は認証サーバーのドメイン」と「呼び出したページのドメイン」は、同じことを言っている。
+
+### Q. `/account/passkey/options` は ID/PW でログイン済みかを確かめる処理だと理解した。それなら段1・段2のテーブルのログイン状況を見るはずだが、新しい webauthnCredentials を見ているように読める。正しいのか。ID/PW が通ったら webauthnCredentials にもログイン状態を書く処理が、別に足される予定なのか
+
+ログインの確認は1行目の `currentUser(c)`（`src/session.ts`）。Cookie から `sessions` テーブルを引き、本物のセッション（stage = full）かを見る。段1・段2のものをそのまま使っている。
+
+`webauthnCredentials` を引いているのは別の目的で、**この利用者が登録済みの鍵の一覧**を取るため。options の `excludeCredentials` に入れ、同じ認証器での二重の登録を防ぐ。ログインの状態は書き込まないし、その予定もない。
+
+### Q. `issueChallenge` の「challenge を作る」の実体は、`const id = randomBytes(32).toString('base64url')` のランダムなバイト列のことか
+
+違う。乱数を**2つ**作っている。
+
+| 変数 | 作る関数 | 何か | どこへ行くか |
+| --- | --- | --- | --- |
+| `challenge` | `newChallenge()`（`src/webauthn.ts`） | **challenge の本体**（32バイトの乱数） | options でブラウザへ渡り、clientDataJSON に入って戻る。DB にはそのまま置く |
+| `id` | `randomBytes(32)` | **引換券**。DB の challenge の行を指す | Cookie（HttpOnly）。DB にはその SHA-256 だけ |
+
+`id` は段1のセッション ID と同じ形の引換券。応答が戻ったとき、Cookie の `id` から「このブラウザに出した challenge」を引き、clientDataJSON の challenge と一致するかを確かめる。challenge の本体はページの JavaScript から見えるが、`id` は見えない。引換券を分けておくと、3-b のログイン（まだセッションがない）でも、「challenge を要求したブラウザ」と「応答を送ってきたブラウザ」が同じだと確かめられる。
+
+### Q. `navigator.credentials.create` は、図では「ブラウザ → 認証器」で、auth には通信が来ない。なぜ await するのか。そもそも await できるものなのか
+
+`await` は通信のためだけのものではなく、**すぐに結果が返らない処理なら何でも**対象になる（Promise を返す関数なら何でも待てる）。`navigator.credentials.create()` は Promise を返す。中で起きているのは「登録 4〜6」で、利用者が指紋を当てるまで、数秒から数分かかる。JavaScript はその間止まって待てない（止まると画面が固まる）ので、「終わったら結果を渡す」という Promise を返し、`await` で受け取る。
+
+待つ相手は、ネットワークの先ではなく、ブラウザ・OS・認証器とその前の利用者。
+
+| 行 | 待つ相手 | 図 |
+| --- | --- | --- |
+| `await post('/account/passkey/options')` | auth | 登録 2 → 3 |
+| `await navigator.credentials.create(...)` | 認証器と利用者 | 登録 4 → 5 → 6 |
+| `await post('/account/passkey/verify', ...)` | auth | 登録 7 → 9 |
+
+### Q. `src/routes/passkey.ts` は、登録 2 と登録 7 の手順が順不同に並んでいるように見える。意図はあるのか
+
+「**先に部品、あとで部品を使うルート**」の順。前半が部品（`issueChallenge` は登録 2、`takeChallenge` は登録 7 で使う）、後半がルート（`POST /account/passkey/options` ＝ 登録 2 → `POST /account/passkey/verify` ＝ 登録 7）で、後半は図の順。関数を使う場所より上に書く、プログラムでよくある書き方。図と照らして読むときは、後半のルートから読み、出てきた関数を前半で引く。
+
+### Q. `src/webauthn.ts`、`src/routes/passkey.ts`、`public/passkey.js` はどう使い分けているのか。routes がどんなリクエストを受けて何を返すかの入口、webauthn.ts がその奥のロジック、で合っているか。public は初めて出てきたが、auth が画面も持っているので画面だけ分けているのか（画面はほかにもあるので、それだけでは説明できない気がする）
+
+前半は合っている。ただし routes と webauthn.ts は**どちらもサーバーで動く**。違いは HTTP と DB に触れるかどうか。public は**動く場所そのものが違う**。
+
+| ファイル | 動く場所 | 中身 | 触れるもの |
+| --- | --- | --- | --- |
+| `src/webauthn.ts` | サーバー | WebAuthn の仕様が決める確認。**RP サーバーのロジック** | 入力のデータだけ。HTTP も DB も知らない |
+| `src/routes/passkey.ts` | サーバー | リクエストを受け、セッションを確かめ、challenge を DB に置き、webauthn.ts に確かめさせ、保存し、応答する。**入口と手続き** | HTTP（Hono）、DB、Cookie |
+| `public/passkey.js` | **利用者のブラウザ** | `navigator.credentials.create` を呼ぶ。**RP アプリケーション** | ブラウザの API |
+
+- **webauthn.ts を分けた理由**：3-b のログインでも同じ確認を使うため。HTTP も DB も要らないので、単体テストで直接試せるため（偽サイトの origin を拒むテストは DB なしで動く）。
+- **public/ の意味**：画面かどうかではなく、**ブラウザにそのまま渡すファイルかどうか**。ほかの画面の HTML は、`src/views.ts` がサーバーで組み立てて送っている。`public/` のファイル（`style.css`、`passkey.js`）は組み立てずにそのまま渡す（`index.ts` の `serveStatic`）。`src/` の TypeScript はサーバーの Node.js で動き、`passkey.js` はブラウザで動く。素の JavaScript なのも、変換せずに渡すため。
+- **JavaScript が初めて出てきた理由**：WebAuthn の API は JavaScript からしか呼べないから。これまでの画面は HTML のフォームだけで済んでいた（フォームを送るのはブラウザの標準の動き）。パスキーは HTML のフォームでは書けないので、ブラウザ側のコードが初めて必要になった。「2. 登場人物」の RP アプリケーションに当たる。
+
+### Q. 「WebAuthn を呼び出す」とは、ブラウザの JavaScript が認証器に鍵の作成を頼む処理のことか。それとも、ブラウザの JavaScript に `navigator.credentials.get()` を実行させるよう指示した auth のことか。後者だから「呼び出したページ」は auth で、ID は auth の FQDN、という理解か。呼び出しというとクライアントからサーバーへの方向を想像するが、この場合は逆で、サーバーからクライアントへの依頼なのか
+
+**前者が近い。**「呼び出す」は、ページの JavaScript がブラウザの API（`navigator.credentials.get()`）を呼ぶこと。その先でブラウザが認証器に頼む。どちらも端末の中の関数の呼び出しで、ネットワークの通信ではない。
+
+**「ページ」は auth のサーバーではなく、ブラウザで開いている auth のページ。**ページの身元（origin）は、どこから読み込んだか（アドレスバーの URL）で決まる。`https://auth.alphajinsei.com/account` を開くと、HTML も `passkey.js` もそこから読み込まれるので、その中の JavaScript が呼べば、呼び出し元は `https://auth.alphajinsei.com`。偽サイトは自分のページの URL を偽れないので、origin も偽れない。
+
+auth は、呼び出すコード（`passkey.js`）と材料（options）を配るだけで、遠隔で命令しているわけではない。ID が auth の FQDN になるのは、「auth が指示したから」ではなく、**呼んだのが auth から読み込んだページだから**。
+
+### Q. challenge も id もクライアントに渡し、認証器は challenge に秘密鍵で署名し、公開鍵と id をサーバーに返す。サーバーは id でどの challenge への応答かを知り、公開鍵で署名を復号し、送った challenge と一致するかを確かめる、という理解でよいか。challenge は署名して返す前提なので元の値が保存されておらず、見分けるために id を括り付けるのか。複数の通信の間で同期したい情報はセッションで持つイメージだが、それはできないのか。元の challenge も署名と一緒に送り返してもらえば紐づけられそうだが、その案はとらなかったのか
+
+いくつか違う。
+
+- **id は認証器にも JavaScript にも渡らない。**HttpOnly の Cookie なので、ブラウザが次のリクエスト（登録 7）に自動で付けて返すだけ。認証器に渡るのは challenge だけ（options の中）。
+- **送り返すのは challenge そのもの。**ブラウザが作る clientDataJSON に入って戻ってくる。
+- **公開鍵を送るのは登録のときだけ。**ログインでは鍵の ID を送り、サーバーは登録のときに保存した公開鍵を引く（毎回送られてくる公開鍵を信じたら、攻撃者が自分の鍵で署名して自分の公開鍵を添えれば通ってしまう）。
+- **署名の検証は「復号」ではない。**原文・署名・公開鍵を入れて、真か偽かが返る計算（ES256 には復号に当たる操作がない）。サーバーは、送られてきた authenticatorData と clientDataJSON から原文（`authenticatorData ‖ SHA-256(clientDataJSON)`）を組み立て、保存した公開鍵で署名を確かめる。それとは別に、clientDataJSON の challenge が、Cookie の id から引いた「出した challenge」と一致するかを確かめる。
+- **登録では challenge に署名はかからない**（attestation を `none` にしたため）。登録の challenge の確認は、clientDataJSON の一致だけ。署名で守られるのはログイン（3-b）。
+- **元の challenge はサーバーが保存している**（`webauthn_challenges.challenge`）。送り返された値は利用者側が自由に作れるので、サーバーが「自分が出した、まだ使っていない challenge」と照らさないと、昔の応答の送り直しを見分けられない。
+- **やっていることはセッションそのもの。**challenge 用の5分だけの小さなセッションで、Cookie に引換券、サーバーに中身、という段1と同じ形。`sessions` テーブルに入れなかったのは、3-b のログインがセッションのない状態から始まるため。登録とログインで同じ仕組みを使えるように分けた。
+- **送り返してもらう案**も実在する。サーバーが challenge に HMAC をかけて渡し、改ざんがないかを確かめれば、何も保存しなくて済む。ただ、期限内なら何度でも送れるので、「一度しか使えない」を守るには「使った」という記録が結局要る。それなら最初から保存する方が単純。
+
+### Q. （理解の確認）`navigator.credentials.create()` を await できるのはなぜか
+
+**理解の確認**：`public/` 配下のコードも auth のサーバーの一部だと誤解していたので、「登録 4 はブラウザと認証器の間の処理なのに、なぜ auth が待てるのか（通信がないのに）」と疑問に思った。実際は、`public/` は auth が配る、ブラウザで動く JavaScript。`create()` を呼ぶのはブラウザの中の `passkey.js` なので、それが待つのは正当。auth のサーバーは、次のリクエスト（登録 7）が来るまで何もしていない。
+
+### Q. JavaScript はサーバーから配信して、クライアント側で実行する。つまり、`navigator.credentials.get()` をローカルのブラウザで実行するように JS を配信した配信元が origin で、それが auth、という理解でよいか
+
+ほぼそのとおり。正確には、origin は **JS のファイルの配信元ではなく、JS を載せたページ（HTML）の URL** で決まる。ブラウザの中では、読み込んだスクリプトはすべて、それを読み込んだページの一部として動く。auth のページが外部の CDN から JS を読み込み、その JS が `navigator.credentials.get()` を呼んでも、origin は `https://auth.alphajinsei.com` のまま。今回はページも `passkey.js` も auth から来ているので、結論は同じ。
+
+origin は「スキーム + ホスト + ポート」（`https://auth.alphajinsei.com`）。RP ID は、そのうちのドメイン（`auth.alphajinsei.com`）だけ。
+
+**理解の確認**：「呼び出し」をクライアントからサーバーへの方向で考えていたのが誤りだった。JS はサーバーから配られてブラウザで動き、そのページの URL がブラウザの API に対する身元（origin）になる。
+
+### Q. HttpOnly の Cookie は、なぜ JavaScript から読めないのか。「JS ではなく HTTP」という意味の名前なのか。一見、HTTP と HTTPS のうち HTTP しか処理しない、と読めて脆弱そうに見える
+
+名前の意図は「**HTTP のやりとりにだけ使う**（JavaScript には見せない）」。ブラウザはこの Cookie をリクエストのヘッダーに付けて送るが、ページの JavaScript の `document.cookie` には出さない。ここでの HTTP はプロトコル全般のことで、HTTPS も含む。「HTTPS のときだけ送る」は、別の **`Secure`** 属性の役目。auth の Cookie には両方を付けている。
+
+| 属性 | 意味 | 防ぐもの |
+| --- | --- | --- |
+| `HttpOnly` | JavaScript から読めない | XSS（ページに紛れ込んだ悪いスクリプト）に Cookie を盗まれること |
+| `Secure` | HTTPS の通信にだけ付ける | 暗号化されていない HTTP での盗み見 |

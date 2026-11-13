@@ -1,4 +1,5 @@
-// パスキーの登録（アカウントの画面から）。流れ：docs/steps/3-passkey.md の図「登録」
+// パスキーの登録（アカウントの画面から）とログイン（ログイン画面から）。流れ：docs/steps/3-passkey.md の図「登録」「ログイン」
+// 並び：前半が部品（challenge の発行と取り出し）、後半がルート（登録、ログインの順。それぞれ図の順）
 // 番号の読み方
 //   「登録 7」   ＝ 図「登録」の 7 番の矢印（図の丸数字。Note には番号がないので「登録 7 のあとの Note」と書く）
 //   「ログイン 7」＝ 図「ログイン」の 7 番の矢印
@@ -9,9 +10,9 @@ import { eq, lt } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { db } from '../db/client.js';
-import { webauthnChallenges, webauthnCredentials } from '../db/schema.js';
-import { currentUser } from '../session.js';
-import { newChallenge, registrationOptions, verifyRegistration } from '../webauthn.js';
+import { users, webauthnChallenges, webauthnCredentials } from '../db/schema.js';
+import { currentUser, startSession } from '../session.js';
+import { authenticationOptions, newChallenge, registrationOptions, verifyAuthentication, verifyRegistration } from '../webauthn.js';
 
 export const passkey = new Hono();
 
@@ -86,6 +87,63 @@ passkey.post('/account/passkey/verify', async (c) => {
 	await db.insert(webauthnCredentials).values({ ...cred, userId: user.id, name });
 	audit('passkey_registered', { username: user.username, name });
 	return c.json({ ok: true });
+});
+
+// ---- ログイン（パスワードなし）。図「ログイン」 ----
+
+// ログイン 2 を受けて、ログイン 3 を返す。まだ誰か分からないので、challenge は利用者に結び付けない
+passkey.post('/login/passkey/options', async (c) => {
+	const challenge = await issueChallenge(c, 'login', null);
+	return c.json(authenticationOptions(challenge));
+});
+
+// ログイン 7 を受けて、ログイン 8（鍵を引く）→ 8 のあとの Note 4つ（確認）→ ログイン 9（更新、セッション）→ ログイン 10
+passkey.post('/login/passkey/verify', async (c) => {
+	// どの理由で断っても、画面には同じことしか出さない。理由は監査ログにだけ残す
+	const fail = (reason: string, credentialId?: string) => {
+		audit('passkey_login_failed', { reason, credentialId });
+		return c.json({ error: 'パスキーでログインできませんでした' }, 400);
+	};
+
+	const row = await takeChallenge(c, 'login');
+	if (!row) return fail('no or expired challenge');
+
+	const body = await c.req.json();
+	const credentialId = String(body.credential?.id ?? '');
+
+	// ログイン 8：鍵の ID から、公開鍵・カウンタ・利用者を引く
+	const [cred] = await db
+		.select({
+			userId: webauthnCredentials.userId,
+			publicKey: webauthnCredentials.publicKey,
+			signCount: webauthnCredentials.signCount,
+			username: users.username,
+		})
+		.from(webauthnCredentials)
+		.innerJoin(users, eq(webauthnCredentials.userId, users.id))
+		.where(eq(webauthnCredentials.id, credentialId));
+	if (!cred) return fail('unknown credential', credentialId); // 削除した鍵、よそで作られた鍵
+
+	let result;
+	try {
+		result = verifyAuthentication(body.credential, row.challenge, cred);
+	} catch (e) {
+		return fail((e as Error).message, credentialId);
+	}
+
+	// ログイン 9：カウンタと最後に使った時刻を更新し、本物のセッションを始める。
+	// パスワードの失敗による一時停止（段1-c）は見ない：あれはパスワードの総当たりを遅くするためで、パスキーは総当たりできない
+	await db
+		.update(webauthnCredentials)
+		.set({ signCount: result.signCount, lastUsedAt: new Date() })
+		.where(eq(webauthnCredentials.id, credentialId));
+	// amr（RFC 8176）：鍵を持っていることの証明。同期される鍵は swk（ソフトウェアの鍵）、端末に固定の鍵は hwk（ハードウェアの鍵）。
+	// 指紋・PIN（ユーザー検証）の分をどう表すかは 3-c で決める
+	await startSession(c, cred.userId, 'full', result.synced ? 'swk' : 'hwk');
+	audit('passkey_login_ok', { username: cred.username });
+
+	// ログイン 10：Set-Cookie（startSession が付けた）と、行き先
+	return c.json({ ok: true, redirect: '/account' });
 });
 
 // アカウントの画面に出す一覧
