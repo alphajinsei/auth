@@ -9,6 +9,7 @@ import { open } from '../secretbox.js';
 import { currentUser, endSession, pendingUser, startSession } from '../session.js';
 import { verifyTotp } from '../totp.js';
 import { accountPage, loginPage, totpLoginPage } from '../views.js';
+import { listPasskeys } from './passkey.js';
 
 export const login = new Hono();
 
@@ -135,8 +136,14 @@ login.get('/account', async (c) => {
 	// 登録した TOTP の状態（行がない／確認待ち／有効）
 	const [cred] = await db.select().from(totpCredentials).where(eq(totpCredentials.userId, user.id));
 	const totp = !cred ? 'none' : cred.confirmedAt ? 'enabled' : 'pending';
-	const notices: Record<string, string> = { enabled: 'TOTP を有効にしました', deleted: 'TOTP を削除しました' };
-	return c.html(accountPage(user.username, user.amr, totp, notices[c.req.query('totp') ?? '']));
+	const passkeys = await listPasskeys(user.id);
+	const notices: Record<string, string> = {
+		'totp=enabled': 'TOTP を有効にしました',
+		'totp=deleted': 'TOTP を削除しました',
+		'passkey=registered': 'パスキーを登録しました',
+	};
+	const [key] = Object.entries(c.req.query()).map(([k, v]) => `${k}=${v}`);
+	return c.html(accountPage(user.username, user.amr, totp, passkeys, notices[key ?? '']));
 });
 
 // GET にしない：<img src=".../logout"> を置くだけで、よそのサイトから勝手にログアウトさせられるため

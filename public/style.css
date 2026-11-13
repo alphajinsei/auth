@@ -9,3 +9,6 @@ h2 { font-size: 1.05rem; margin-top: 28px; }
 .notice { color: #1b5e20; background: #e8f5e9; padding: 8px; border-radius: 4px; }
 button.secondary { background: #fff; border: 1px solid #999; }
 code { word-break: break-all; }
+.error-text { color: #b3261e; }
+ul.passkeys { padding-left: 1.2em; }
+ul.passkeys li { margin-bottom: 8px; }

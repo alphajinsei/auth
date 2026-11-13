@@ -23,6 +23,8 @@ FIDO のシーケンスは、次の7つの要素の組み合わせで説明で�
 
 下の図の Note の「〜を確かめる」は、どれもこの番号のどれかに当たる。
 
+**番号が2種類あるので注意**。この表の ①〜⑦ は**要素**の番号。下の図の丸数字は、Mermaid が矢印に振る**手順**の番号で、別物。コードのコメントでは、要素を「要素③」、手順を「登録 7」「ログイン 7」（どの図の何番の矢印か）と書き分ける。Note には番号がないので、「登録 7 のあとの 2つ目の Note」のように、直前の矢印で指す。
+
 ## 2. 登場人物
 
 | 名前 | 何か | このリポジトリでは |
@@ -63,7 +65,7 @@ sequenceDiagram
 
   U->>B: 「パスキーを登録」を押す
   B->>A: POST /account/passkey/options（ログイン中）
-  Note over A: challenge を乱数で作り、このセッションに覚える（5分）
+  Note over A: challenge を乱数で作り、短命の Cookie に結び付けて覚える（5分。発行した利用者も記録）
   A-->>B: 登録の options（RP ID、利用者の ID と名前、challenge、使える署名の方式 ES256 など、登録済みの鍵の一覧）
   B->>K: navigator.credentials.create（options）
   K->>U: 指紋・顔・PIN を求める（ユーザー検証）
@@ -80,6 +82,22 @@ sequenceDiagram
 - 登録の画面にログインしていることが前提。誰が自分のアカウントに鍵を足せるかを、既存のログイン（パスワード、TOTP）で守っている。
 - attestation（認証器の製造元の証明）は求めない（`none`）。個人のサービスでは、どの認証器かを制限する理由がない。
 - 「登録済みの鍵の一覧」を渡すのは、同じ認証器で二重に登録しないため（認証器が「もう登録済み」と断る）。
+
+#### 図「登録」とコードの対応
+
+| 手順 | 図の中身 | コード |
+| --- | --- | --- |
+| 登録 1 | 「パスキーを登録」を押す | [public/passkey.js](../../public/passkey.js) の `submit` |
+| 登録 2 | POST /account/passkey/options | [src/routes/passkey.ts](../../src/routes/passkey.ts) の `POST /account/passkey/options`（ログイン中か＝要素⑥） |
+| 登録 2 のあとの Note | challenge を作り、覚える | 同じファイルの `issueChallenge`、[src/webauthn.ts](../../src/webauthn.ts) の `newChallenge` |
+| 登録 3 | options を返す | `src/webauthn.ts` の `registrationOptions` |
+| 登録 4〜6 | 認証器が鍵ペアを作る | `public/passkey.js` の `navigator.credentials.create`。中身はブラウザと OS（コードはない） |
+| 登録 6 のあとの Note | clientDataJSON を作る | ブラウザ。`public/passkey.js` の `credential.toJSON()` がまとめる |
+| 登録 7 | POST /account/passkey/verify | `src/routes/passkey.ts` の `POST /account/passkey/verify`。最初に `takeChallenge`（取り出して消す） |
+| 登録 7 のあとの 1つ目の Note | 種類・challenge・origin | `src/webauthn.ts` の `checkClientData`（要素②③） |
+| 登録 7 のあとの 2つ目の Note | 分解、RP ID のハッシュとフラグ | `src/webauthn.ts` の `verifyRegistration` → `checkAuthData`（要素④⑤）、`coseToKey`（要素①） |
+| 登録 8 | 鍵の ID、公開鍵、カウンタを保存 | `src/routes/passkey.ts` の `db.insert(webauthnCredentials)` |
+| 登録 9 | 「パスキーを登録しました」 | `src/routes/passkey.ts` の `c.json({ ok: true })` → `public/passkey.js` が `/account?passkey=registered` へ |
 
 ### ログイン（パスワードなし）
 
@@ -117,6 +135,8 @@ sequenceDiagram
 - **カウンタ**は、認証器が署名のたびに増やす数。保存した値より増えていなければ、鍵が複製された疑いがある。ただし、同期されるパスキーは、端末の間でカウンタを合わせられないので、常に 0 を返すものが多い。0 のときは確かめない。
 - ユーザー検証（指紋・PIN）を済ませた鍵なので、パスキー1つで多要素になる。TOTP は求めない。
 - 段2と同じく、利用者がいない鍵の ID、署名違い、などの理由は、画面には同じことしか出さず、監査ログにだけ残す。
+
+図「ログイン」とコードの対応の表は、3-b を作るときに足す。
 
 ## 4. 自分で書くところ、ライブラリに任せるところ
 

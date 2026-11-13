@@ -1,4 +1,4 @@
-import { datetime, int, mysqlTable, timestamp, varchar } from 'drizzle-orm/mysql-core';
+import { bigint, datetime, int, mysqlTable, text, timestamp, varchar } from 'drizzle-orm/mysql-core';
 
 // 利用者。登録の画面はなく、管理用のコマンド（src/admin.ts）で作る
 export const users = mysqlTable('users', {
@@ -39,4 +39,33 @@ export const totpCredentials = mysqlTable('totp_credentials', {
 	// 最後に通った時刻の枠の番号。これ以前の枠は拒む（同じ6桁の再利用の防止）
 	lastStep: int('last_step'),
 	createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// 利用者に登録したパスキー（1人に複数）。流れ：docs/steps/3-passkey.md
+// サーバーに置くのは公開鍵だけ。漏れても、攻撃者が使えるものはない
+export const webauthnCredentials = mysqlTable('webauthn_credentials', {
+	// 鍵の ID（認証器が作る。base64url）。ログインのとき、どの鍵で署名したかをこれで知らせてくる
+	id: varchar('id', { length: 512 }).primaryKey(),
+	userId: varchar('user_id', { length: 36 })
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	// 公開鍵。認証器が渡してきた COSE（CBOR）の形のまま、base64url で置く。検証のときに Node.js の鍵に直す
+	publicKey: text('public_key').notNull(),
+	// 署名のたびに認証器が増やす数（同期されるパスキーは 0 のまま）。最大 2^32-1 なので bigint
+	signCount: bigint('sign_count', { mode: 'number', unsigned: true }).notNull().default(0),
+	// 鍵がどう届くか（usb、nfc、ble、internal、hybrid）。登録済みの一覧として渡すときに添える
+	transports: varchar('transports', { length: 255 }),
+	name: varchar('name', { length: 64 }).notNull(), // 「iPhone」などの表示用
+	createdAt: timestamp('created_at').notNull().defaultNow(),
+	lastUsedAt: datetime('last_used_at'),
+});
+
+// 発行した challenge（5分。一度使ったら消す）。Cookie には乱数の ID を入れ、ここにはその SHA-256 を置く（セッションと同じ形）
+export const webauthnChallenges = mysqlTable('webauthn_challenges', {
+	idHash: varchar('id_hash', { length: 64 }).primaryKey(),
+	challenge: varchar('challenge', { length: 64 }).notNull(), // 32バイトの乱数の base64url
+	purpose: varchar('purpose', { length: 16 }).notNull(), // register / login
+	// 登録のときだけ：誰のための challenge か（発行したときのログイン中の利用者）
+	userId: varchar('user_id', { length: 36 }).references(() => users.id, { onDelete: 'cascade' }),
+	expiresAt: datetime('expires_at').notNull(),
 });

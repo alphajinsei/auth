@@ -34,7 +34,12 @@ export type TotpStatus = 'none' | 'pending' | 'enabled';
 // amr の値（RFC 8176）を、画面に出す言葉にする
 const amrLabel: Record<string, string> = { pwd: 'パスワード', otp: 'TOTP（ワンタイムパスワード）' };
 
-export const accountPage = (username: string, amr: string, totp: TotpStatus, notice?: string) =>
+export type PasskeyRow = { name: string; createdAt: Date; lastUsedAt: Date | null };
+
+// 日時は利用者の地域に関わらず、日本時間で出す（個人のサービスなので）
+const jst = (d: Date) => d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', dateStyle: 'short', timeStyle: 'short' });
+
+export const accountPage = (username: string, amr: string, totp: TotpStatus, passkeys: PasskeyRow[], notice?: string) =>
 	layout(
 		'アカウント',
 		html`
@@ -48,6 +53,21 @@ export const accountPage = (username: string, amr: string, totp: TotpStatus, not
         <form method="post" action="/account/totp/delete"><button class="secondary">TOTP を削除</button></form>`
 			: html`<p>${totp === 'pending' ? '登録の途中です（確認の6桁がまだ）。' : '未登録。'}</p>
         <form method="post" action="/account/totp/setup"><button>TOTP を登録</button></form>`}
+
+    <h2>パスキー</h2>
+    ${passkeys.length
+			? html`<ul class="passkeys">
+          ${passkeys.map(
+						(p) => html`<li><strong>${p.name}</strong><br><small>登録 ${jst(p.createdAt)}・最後に使った ${p.lastUsedAt ? jst(p.lastUsedAt) : 'まだ'}</small></li>`,
+					)}
+        </ul>`
+			: html`<p>未登録。</p>`}
+    <form id="passkey-register">
+      <label>名前（どの端末か） <input name="name" maxlength="64" placeholder="iPhone、仕事のパソコン など"></label>
+      <button>パスキーを登録</button>
+    </form>
+    <p id="passkey-message" class="error-text"></p>
+    <script src="/passkey.js" defer></script>
 
     <h2>ログアウト</h2>
     <form method="post" action="/logout">

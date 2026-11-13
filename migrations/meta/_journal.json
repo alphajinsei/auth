@@ -22,6 +22,13 @@
       "when": 1794422276708,
       "tag": "0002_session_stage_amr",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1794585246938,
+      "tag": "0003_webauthn",
+      "breakpoints": true
     }
   ]
 }
