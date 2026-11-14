@@ -38,7 +38,7 @@ async function issueChallenge(c: Context, purpose: Purpose, userId: string | nul
 	return challenge;
 }
 
-// 登録 7 ／ ログイン 7 を受けたとき：challenge を取り出し、同時に消す（一度しか使えない）。
+// 登録 7 のあとの 1つ目の Note ／ ログイン 7 のあとの Note：challenge を取り出し、同時に消す（一度しか使えない）。
 // DELETE が実際に行を消したときだけ返すので、同じ応答が同時に2本来ても、通るのは1本だけ
 async function takeChallenge(c: Context, purpose: Purpose) {
 	const id = getCookie(c, COOKIE);
@@ -62,7 +62,7 @@ passkey.post('/account/passkey/options', async (c) => {
 	return c.json(registrationOptions(user, challenge, existing));
 });
 
-// 登録 7 を受けて、7 のあとの Note 2つ（確認）→ 登録 8（保存）→ 登録 9（返事）
+// 登録 7 を受けて、7 のあとの Note 3つ（challenge を取り出す、確認2つ）→ 登録 8（保存）→ 登録 9（返事）
 passkey.post('/account/passkey/verify', async (c) => {
 	const user = await currentUser(c);
 	if (!user) return c.json({ error: 'ログインしてください' }, 401);
@@ -97,7 +97,7 @@ passkey.post('/login/passkey/options', async (c) => {
 	return c.json(authenticationOptions(challenge));
 });
 
-// ログイン 7 を受けて、ログイン 8（鍵を引く）→ 8 のあとの Note 4つ（確認）→ ログイン 9（更新、セッション）→ ログイン 10
+// ログイン 7 を受けて、7 のあとの Note（challenge を取り出す）→ ログイン 8（鍵を引く）→ 8 のあとの Note 4つ（確認）→ ログイン 9（更新、セッション）→ ログイン 10
 passkey.post('/login/passkey/verify', async (c) => {
 	// どの理由で断っても、画面には同じことしか出さない。理由は監査ログにだけ残す
 	const fail = (reason: string, credentialId?: string) => {

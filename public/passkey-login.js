@@ -1,6 +1,6 @@
 // ブラウザ側（RP アプリケーション）。流れ：docs/steps/3-passkey.md の図「ログイン」
 // 番号の読み方
-//   「ログイン 7」＝ 図「ログイン」の 7 番の矢印（図の丸数字。Note には番号がないので「ログイン 6 のあとの Note」と書く）
+//   「ログイン 7」＝ 図「ログイン」の 7 番の矢印（図の丸数字。Note には番号がないので「ログイン 3 のあとの Note」と書く）
 //   「要素③」   ＝ 「1. 技術の要素」の表の ③
 // どの関数が図のどこに当たるかの一覧は、文書の図の下の「図とコードの対応」の表
 //   options（JSON）→ parseRequestOptionsFromJSON → navigator.credentials.get → credential.toJSON()（JSON）
@@ -25,11 +25,12 @@ button?.addEventListener('click', async () => {
   try {
     // ログイン 2 → ログイン 3：challenge 入りの options をもらう（ユーザー名は送らない）
     const options = await post('/login/passkey/options');
-    // ログイン 4 → 5 → 6：認証器がこの RP ID の鍵を探して利用者に選ばせ、指紋・PIN のあとで署名する
+    // ログイン 3 のあとの Note：get を呼ぶと、ブラウザが RP ID を今のページのドメインと照らし、clientDataJSON を作る
+    // ログイン 4 → 5 → 6：認証器がこの RP ID の鍵を探して利用者に選ばせ、指紋・PIN のあとで署名する。終わるまで await で待つ
     const credential = await navigator.credentials.get({
       publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options),
     });
-    // ログイン 6 のあとの Note：ブラウザが clientDataJSON（種類・challenge・origin）を作って添えている
+    // credential には、認証器の応答（authenticatorData、署名、利用者の ID）と、ブラウザが作った clientDataJSON の両方が入っている
     // ログイン 7：鍵の ID、authenticatorData、署名、利用者の ID、clientDataJSON をまとめて送る
     const result = await post('/login/passkey/verify', { credential: credential.toJSON() });
     // ログイン 10：セッションの Cookie はもう付いている。アカウントの画面へ

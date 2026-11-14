@@ -79,6 +79,48 @@ RP サーバーと RP アプリケーションを別のサービスに分ける�
 
 ## 3. 流れ
 
+### 誰が何を作り、何を渡すか（文章で）
+
+auth が送るのは options だけ。その中身は、ブラウザと認証器を通って、形を変えて戻ってくる。ログインの場合：
+
+1. **auth** が options（RP ID、challenge、ユーザー検証が必要か）を作り、ブラウザの JavaScript に渡す。
+2. **JavaScript** が、それを `navigator.credentials.get()` に渡す。
+3. **ブラウザ**が RP ID を今のページのドメインと照らす。合えば、challenge と、自分が見ている origin を入れて clientDataJSON を作る。
+4. **ブラウザ**が認証器に、RP ID、clientDataJSON の**ハッシュ**（中身ではない）、ユーザー検証が必要か、を渡して署名を頼む。
+5. **認証器**が、その RP ID の鍵を探して利用者に選ばせ、指紋・PIN で本人を確かめる。authenticatorData（RP ID のハッシュ、フラグ、カウンタ）を作り、「authenticatorData ‖ clientDataJSON のハッシュ」に秘密鍵で署名する。
+6. **認証器**がブラウザに、鍵の ID、authenticatorData、署名、利用者の ID を返す。
+7. **JavaScript** が、それと clientDataJSON そのものをまとめて auth に送る。
+8. **auth** が、clientDataJSON と authenticatorData から原文を組み立て直し、公開鍵で署名を検証する。中身（challenge、origin、RP ID のハッシュ、フラグ、カウンタ）もそれぞれ確かめる。
+
+登録も同じ形で、5 が「鍵ペアを新しく作り、RP ID に結び付けて覚える」、6 が「authenticatorData に鍵の ID と公開鍵を付け、attestationObject に包んで返す」になる（attestation が `none` なので署名はない）。
+
+**届くものは、作り手が2人に分かれている。**
+
+```
+id                 鍵の ID                                              認証器
+clientDataJSON     { type: "webauthn.get", challenge, origin }          ブラウザ
+authenticatorData  RP ID のハッシュ | フラグ | カウンタ                   認証器
+signature          authenticatorData ‖ SHA-256(clientDataJSON) への署名  認証器
+userHandle         利用者の ID                                          認証器
+```
+
+challenge と origin は Web の世界の情報なのでブラウザが、RP ID・本人を確かめたか・カウンタは端末の側の情報なので認証器が書く。認証器は clientDataJSON の中身を見ないが、そのハッシュに署名するので、2人が別々に作ったものが1つの署名で結び付く。
+
+**options の中身はどこへ行くか。**
+
+| options の項目 | 誰が使うか | 応答のどこに現れるか |
+| --- | --- | --- |
+| `challenge` | ブラウザ | clientDataJSON の中に、そのまま |
+| `rp.id` / `rpId` | ブラウザ（照合）、認証器（鍵の選択） | authenticatorData の先頭に、ハッシュで |
+| `userVerification` | 認証器（指紋・PIN） | authenticatorData のフラグ（UV） |
+| `user.id`（登録） | 認証器が鍵と一緒に覚える | ログインのときの userHandle |
+| `pubKeyCredParams`（登録） | 認証器が方式を選ぶ | 公開鍵（COSE）の中の `alg` |
+| `excludeCredentials`（登録） | 認証器 | 現れない（登録済みなら断る） |
+| `rp.name`、`user.name`（登録） | 認証器が覚え、鍵を選ぶ画面に出す | 現れない |
+| `timeout` | ブラウザ | 現れない |
+
+auth が出した値は、ブラウザか認証器を通って戻ってきて、どれも署名の原文に入っている。サーバーは、自分が出した値と照らすだけでよい。
+
 ### 登録（ログインしたあと、アカウントの画面から）
 
 ```mermaid
@@ -94,12 +136,13 @@ sequenceDiagram
   B->>A: POST /account/passkey/options（ログイン中）
   Note over A: challenge を乱数で作り、短命の Cookie に結び付けて覚える（5分。発行した利用者も記録）
   A-->>B: 登録の options（RP ID、利用者の ID と名前、challenge、使える署名の方式 ES256 など、登録済みの鍵の一覧）
-  B->>K: navigator.credentials.create（options）
+  Note over B: JavaScript が navigator.credentials.create（options）を呼ぶ。ブラウザが RP ID を今のページのドメインと照らし、clientDataJSON を作る（種類 webauthn.create、challenge、ブラウザが見ている origin）
+  B->>K: 鍵ペアを作るよう頼む（RP ID、利用者の ID、clientDataJSON のハッシュ）
   K->>U: 指紋・顔・PIN を求める（ユーザー検証）
   Note over K: この RP ID 用の鍵ペアを新しく作る。秘密鍵は外に出さない
   K-->>B: attestationObject（公開鍵、鍵の ID、RP ID のハッシュ、フラグ、カウンタ）
-  Note over B: ブラウザが clientDataJSON を作る（種類 webauthn.create、challenge、ブラウザが見ている origin）
   B->>A: POST /account/passkey/verify（attestationObject、clientDataJSON）
+  Note over A: Cookie の引換券から、出した challenge を取り出して消す（一度きり）
   Note over A: clientDataJSON の種類・challenge・origin を確かめる
   Note over A: attestationObject を分解（ライブラリ）し、RP ID のハッシュとフラグ（本人がいた・本人を確かめた）を確かめる
   A->>DB: 鍵の ID、公開鍵、カウンタを保存
@@ -118,11 +161,12 @@ sequenceDiagram
 | 登録 2 | POST /account/passkey/options | [src/routes/passkey.ts](../../src/routes/passkey.ts) の `POST /account/passkey/options`（ログイン中か＝要素⑥） |
 | 登録 2 のあとの Note | challenge を作り、覚える | 同じファイルの `issueChallenge`、[src/webauthn.ts](../../src/webauthn.ts) の `newChallenge` |
 | 登録 3 | options を返す | `src/webauthn.ts` の `registrationOptions` |
-| 登録 4〜6 | 認証器が鍵ペアを作る | `public/passkey-register.js` の `navigator.credentials.create`。中身はブラウザと OS（コードはない） |
-| 登録 6 のあとの Note | clientDataJSON を作る | ブラウザ。`public/passkey-register.js` の `credential.toJSON()` がまとめる |
-| 登録 7 | POST /account/passkey/verify | `src/routes/passkey.ts` の `POST /account/passkey/verify`。最初に `takeChallenge`（取り出して消す） |
-| 登録 7 のあとの 1つ目の Note | 種類・challenge・origin | `src/webauthn.ts` の `checkClientData`（要素②③） |
-| 登録 7 のあとの 2つ目の Note | 分解、RP ID のハッシュとフラグ | `src/webauthn.ts` の `verifyRegistration` → `checkAuthData`（要素④⑤）、`coseToKey`（要素①） |
+| 登録 3 のあとの Note | create を呼ぶ。ブラウザが RP ID を照らし、clientDataJSON を作る | `public/passkey-register.js` の `navigator.credentials.create`。照合と clientDataJSON はブラウザ（コードはない） |
+| 登録 4〜6 | 認証器が鍵ペアを作る | ブラウザと OS と認証器（コードはない）。JavaScript は `await` で終わるのを待つ |
+| 登録 7 | POST /account/passkey/verify | `public/passkey-register.js` の `credential.toJSON()` でまとめて送る → `src/routes/passkey.ts` の `POST /account/passkey/verify` |
+| 登録 7 のあとの 1つ目の Note | 出した challenge を取り出して消す | `src/routes/passkey.ts` の `takeChallenge` |
+| 登録 7 のあとの 2つ目の Note | 種類・challenge・origin | `src/webauthn.ts` の `checkClientData`（要素②③） |
+| 登録 7 のあとの 3つ目の Note | 分解、RP ID のハッシュとフラグ | `src/webauthn.ts` の `verifyRegistration` → `checkAuthData`（要素④⑤）、`coseToKey`（要素①） |
 | 登録 8 | 鍵の ID、公開鍵、カウンタを保存 | `src/routes/passkey.ts` の `db.insert(webauthnCredentials)` |
 | 登録 9 | 「パスキーを登録しました」 | `src/routes/passkey.ts` の `c.json({ ok: true })` → `public/passkey-register.js` が `/account?passkey=registered` へ |
 
@@ -141,13 +185,14 @@ sequenceDiagram
   B->>A: POST /login/passkey/options
   Note over A: challenge を作り、短命の Cookie に結び付けて覚える（5分）
   A-->>B: ログインの options（RP ID、challenge）。鍵の一覧は渡さない
-  B->>K: navigator.credentials.get（options）
+  Note over B: JavaScript が navigator.credentials.get（options）を呼ぶ。ブラウザが RP ID を今のページのドメインと照らし、clientDataJSON を作る（種類 webauthn.get、challenge、origin）
+  B->>K: 署名するよう頼む（RP ID、clientDataJSON のハッシュ）
   Note over K: この RP ID の鍵を探し、利用者に選ばせる（ユーザー名を入れなくてよい）
   K->>U: 指紋・顔・PIN を求める
   Note over K: 署名する。対象は authenticatorData と、clientDataJSON のハッシュ
   K-->>B: 鍵の ID、authenticatorData、署名、利用者の ID
-  Note over B: ブラウザが clientDataJSON を作る（種類 webauthn.get、challenge、origin）
   B->>A: POST /login/passkey/verify（上の全部と clientDataJSON）
+  Note over A: Cookie の引換券から、出した challenge を取り出して消す（一度きり）
   A->>DB: 鍵の ID から、公開鍵・カウンタ・利用者を引く
   Note over A: clientDataJSON の種類・challenge・origin を確かめる
   Note over A: authenticatorData の RP ID のハッシュとフラグを確かめる
@@ -171,9 +216,10 @@ sequenceDiagram
 | ログイン 2 | POST /login/passkey/options | [src/routes/passkey.ts](../../src/routes/passkey.ts) の `POST /login/passkey/options`（ログインしていなくてよい） |
 | ログイン 2 のあとの Note | challenge を作り、短命の Cookie に結び付ける | 同じファイルの `issueChallenge`（利用者には結び付けない）、[src/webauthn.ts](../../src/webauthn.ts) の `newChallenge` |
 | ログイン 3 | options を返す（鍵の一覧なし） | `src/webauthn.ts` の `authenticationOptions` |
-| ログイン 4〜6 | 認証器が鍵を選ばせ、指紋・PIN のあとで署名する | `public/passkey-login.js` の `navigator.credentials.get`。中身はブラウザと OS |
-| ログイン 6 のあとの Note | clientDataJSON を作る | ブラウザ。`credential.toJSON()` がまとめる |
-| ログイン 7 | POST /login/passkey/verify | `src/routes/passkey.ts` の `POST /login/passkey/verify`。最初に `takeChallenge`（取り出して消す） |
+| ログイン 3 のあとの Note | get を呼ぶ。ブラウザが RP ID を照らし、clientDataJSON を作る | `public/passkey-login.js` の `navigator.credentials.get`。照合と clientDataJSON はブラウザ（コードはない） |
+| ログイン 4〜6 | 認証器が鍵を選ばせ、指紋・PIN のあとで署名する | ブラウザと OS と認証器（コードはない）。JavaScript は `await` で終わるのを待つ |
+| ログイン 7 | POST /login/passkey/verify | `public/passkey-login.js` の `credential.toJSON()` でまとめて送る → `src/routes/passkey.ts` の `POST /login/passkey/verify` |
+| ログイン 7 のあとの Note | 出した challenge を取り出して消す | 同じルートの最初の `takeChallenge` |
 | ログイン 8 | 鍵の ID から公開鍵・カウンタ・利用者を引く | 同じルートの `db.select(...).from(webauthnCredentials)` |
 | ログイン 8 のあとの 1つ目の Note | 種類・challenge・origin | `src/webauthn.ts` の `verifyAuthentication` → `checkClientData`（要素②③） |
 | ログイン 8 のあとの 2つ目の Note | RP ID のハッシュとフラグ | `verifyAuthentication` → `checkAuthData`（要素④⑤）。続けて user handle が鍵の持ち主か |
@@ -184,7 +230,7 @@ sequenceDiagram
 
 **challenge と鍵の ID は、別々の役目で照らす。**サーバーは2つのものを引く。
 
-- Cookie の引換券から引くのは「このブラウザに出した challenge」（ログイン 7 の `takeChallenge`）。
+- Cookie の引換券から引くのは「このブラウザに出した challenge」（ログイン 7 のあとの Note、`takeChallenge`）。
 - 鍵の ID から引くのは、登録で預かった公開鍵（ログイン 8）。
 
 そのうえで、届いた authenticatorData と clientDataJSON から署名の原文を組み立て、その公開鍵で検証する（3つ目の Note）。clientDataJSON の中の challenge は、1つ目の Note で、引いた challenge と比べてある。原文に challenge が入っているので、署名が正しければ「この鍵の持ち主が、今回の challenge に応えた」と言える。

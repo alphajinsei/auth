@@ -55,7 +55,7 @@ export function registrationOptions(
 	};
 }
 
-// 登録 7 のあとの 1つ目の Note ／ ログイン 8 のあとの 1つ目の Note：clientDataJSON（ブラウザが作る）を確かめる
+// 登録 7 のあとの 2つ目の Note ／ ログイン 8 のあとの 1つ目の Note：clientDataJSON（ブラウザが作る）を確かめる
 // 要素②③：種類・challenge・origin。origin はブラウザが書き込むので、ページの JavaScript には偽れない
 export function checkClientData(clientDataJSON: string, type: 'webauthn.create' | 'webauthn.get', challenge: string) {
 	const raw = Buffer.from(clientDataJSON, 'base64url');
@@ -67,7 +67,7 @@ export function checkClientData(clientDataJSON: string, type: 'webauthn.create' 
 	return raw; // ログインの署名の検証で、このバイト列のハッシュを使う
 }
 
-// 登録 7 のあとの 2つ目の Note の後半 ／ ログイン 8 のあとの 2つ目の Note：authenticatorData（認証器が作る）を確かめる
+// 登録 7 のあとの 3つ目の Note の後半 ／ ログイン 8 のあとの 2つ目の Note：authenticatorData（認証器が作る）を確かめる
 export function checkAuthData(authData: Uint8Array<ArrayBuffer>) {
 	const parsed = parseAuthenticatorData(authData);
 	// 要素④ RP ID のハッシュ：認証器が「どのサイトの鍵として使ったか」。自分の RP ID でなければ拒む
@@ -77,7 +77,7 @@ export function checkAuthData(authData: Uint8Array<ArrayBuffer>) {
 	return parsed;
 }
 
-// 登録 7 のあとの Note 2つ：ブラウザから返ってきた登録の応答を確かめ、保存するもの（登録 8）を取り出す
+// 登録 7 のあとの 2つ目と3つ目の Note：ブラウザから返ってきた登録の応答を確かめ、保存するもの（登録 8）を取り出す
 // body は credential.toJSON() の形（バイト列はすべて base64url）
 export function verifyRegistration(body: any, challenge: string) {
 	if (body?.type !== 'public-key') throw new Error('bad credential type');
@@ -146,7 +146,7 @@ export function verifyAuthentication(
 	return { signCount: auth.counter, synced: auth.flags.be };
 }
 
-// 登録 7 のあとの 2つ目の Note（登録の時点の確認）／ ログイン 8 のあとの 3つ目の Note（署名の検証）で使う。
+// 登録 7 のあとの 3つ目の Note（登録の時点の確認）／ ログイン 8 のあとの 3つ目の Note（署名の検証）で使う。
 // COSE（CBOR の Map。キーは番号）の公開鍵を、Node.js の鍵（JWK 経由）に直す
 // 番号は RFC 9053：1=kty、3=alg、EC2 は -1=crv、-2=x、-3=y、RSA は -1=n、-2=e
 export function coseToKey(cose: Uint8Array<ArrayBuffer>): { key: KeyObject; alg: number } {

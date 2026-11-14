@@ -807,3 +807,83 @@ origin は「スキーム + ホスト + ポート」（`https://auth.alphajinsei
 | --- | --- | --- |
 | `HttpOnly` | JavaScript から読めない | XSS（ページに紛れ込んだ悪いスクリプト）に Cookie を盗まれること |
 | `Secure` | HTTPS の通信にだけ付ける | 暗号化されていない HTTP での盗み見 |
+
+### Q. ログインのときの options と、登録のときの options は別なのか
+
+別。登録は「新しい鍵を作る」ための材料が全部要るが、ログインは「どのサイトの鍵で、この challenge に署名して」だけでよい。
+
+| | 登録（`registrationOptions`） | ログイン（`authenticationOptions`） |
+| --- | --- | --- |
+| RP | `rp: { id, name }` | `rpId` だけ |
+| challenge | ある | ある |
+| 利用者 | `user: { id, name, displayName }`（認証器に覚えさせる） | なし（まだ誰か分からない。認証器が返してくる） |
+| 署名の方式 | `pubKeyCredParams`（ES256、RS256） | なし（鍵はもうある） |
+| 登録済みの鍵 | `excludeCredentials`（二重の登録を防ぐ） | `allowCredentials` は渡さない（discoverable なので認証器が探す） |
+| その他 | `attestation`、`authenticatorSelection` | `userVerification` |
+
+### Q. RP ID は誰が指定し、誰が検証するのか。登録のとき、クライアントが「この RP ID で鍵を作って」と言うのか、サーバーが決めるのか。認証器が特定の RP ID で鍵を作り、auth がそれを検証する、という流れか。ログインで、鍵の RP ID が自分のものと一致するかを確かめるのが動作 8 か
+
+**決めるのはサーバー（RP サーバー）、確かめるのはブラウザ・認証器・サーバーの3者。**
+
+| 誰が | 何をするか | どこで |
+| --- | --- | --- |
+| **サーバー** | RP ID を決めて、options に入れる | 登録 3（`rp.id`）、ログイン 3（`rpId`） |
+| JavaScript | options をそのままブラウザの API に渡す（中継するだけ） | `navigator.credentials.create` / `get` |
+| **ブラウザ** | RP ID が今のページのドメイン（かその親）か確かめる。違えば、認証器に頼まずに断る | 登録 3 / ログイン 3 のあとの Note |
+| **認証器** | 登録では鍵をその RP ID に結び付けて覚える。ログインでは、その RP ID の鍵だけを探す。どちらも authenticatorData に RP ID のハッシュを入れる | 登録 4〜6 / ログイン 4〜6 |
+| **サーバー** | authenticatorData の RP ID のハッシュが、自分の RP ID のハッシュと一致するか確かめる | 登録 7 のあとの 3つ目の Note、ログイン 8 のあとの 2つ目の Note（`checkAuthData`） |
+
+クライアントが自分で RP ID を言い出すのではなく、サーバーが決めた値を、ブラウザが「このページで使ってよい値か」と確かめてから認証器に渡す。ログインの動作 8 は「鍵の ID から公開鍵を引く」で、RP ID の確認はその次の 2つ目の Note。
+
+### Q. 認証器から送られてくるのは、鍵の情報（challenge への署名など）だけでなく、RP ID などもまとめて来るはず。ざっくり何が来るのか。RP ID と、challenge を秘密鍵で署名したものが本体（authenticatorData）かと思ったが、clientDataJSON も来ている
+
+送られてくるものは、**作った者が2人いる**。ブラウザが作る clientDataJSON と、認証器が作る authenticatorData・署名。
+
+ログイン（`credential.toJSON()`）の中身：
+
+```
+id               鍵の ID                                    認証器
+response
+  clientDataJSON   { type: "webauthn.get", challenge, origin }   ブラウザ
+  authenticatorData  RP ID のハッシュ(32) | フラグ(1) | カウンタ(4)   認証器
+  signature        authenticatorData ‖ SHA-256(clientDataJSON) への署名   認証器
+  userHandle       利用者の ID（登録のときに覚えさせたもの）         認証器
+```
+
+登録では、authenticatorData のうしろに「鍵の ID と公開鍵」が付き、それが attestationObject（`{ fmt, attStmt, authData }`）に包まれて来る。attestation を `none` にしたので、登録には署名がない。
+
+推察と違うのは、**challenge は authenticatorData に入らない**こと。challenge と origin は、Web の世界の情報で、ブラウザが知っている。RP ID、本人を確かめたか、カウンタは、端末の側の情報で、認証器が知っている。
+
+- ブラウザは、clientDataJSON を作ってから、その**ハッシュだけ**を認証器に渡す（認証器は origin も challenge も直接は見ない）。
+- 認証器は「authenticatorData ‖ そのハッシュ」に署名する。
+
+こうして、2人が別々に作ったものが、1つの署名で結び付けられる。サーバーは、届いた2つから同じ原文を組み立てて検証するので、clientDataJSON の challenge と origin も、authenticatorData の RP ID も、まとめて署名で守られる。
+
+（この問いのおかげで、図の誤りが見つかった。clientDataJSON は、認証器が応答したあとではなく、認証器に頼む前に作られる。そのハッシュを認証器に渡す必要があるため。図を直した。）
+
+### Q. ログインの `const row = await takeChallenge(c, 'login')` は何か。図のどこに当たるのか。`/login/passkey/options` を受けてから「鍵の ID から、公開鍵・カウンタ・利用者を引く」の間にいるように見える
+
+**ログイン 7（POST /login/passkey/verify）を受けて、最初にすること**。ログイン 2 のあとの Note で覚えておいた challenge を、Cookie の引換券で取り出し、同時に消す（一度しか使えない）。取り出した challenge は、ログイン 8 のあとの 1つ目の Note で、clientDataJSON の challenge と比べる。
+
+時間の順では、`/login/passkey/options` のルートはログイン 3 で終わっている。そのあとログイン 4〜6 はブラウザと認証器の中の出来事で、サーバーは何もしていない。ログイン 7 で `/login/passkey/verify` のルートが始まり、その最初が `takeChallenge`、次がログイン 8。
+
+元の図には、この「取り出して消す」が描かれていなかった。DB の別の表（`webauthn_challenges`）への操作で、図に載せていなかったため。「ログイン 7 のあとの Note」「登録 7 のあとの 1つ目の Note」として足した。
+
+### Q. サーバーから送っていたのは options だけだが、それも届くものの中に含まれているのか。auth が options をブラウザに渡し、ブラウザが challenge などを clientDataJSON に埋め込んで認証器に渡し、認証器が clientDataJSON をもとに鍵を選ぶか作り、authenticatorData を作り、clientDataJSON のハッシュと authenticatorData に秘密鍵で署名して送り返す、という構図か
+
+ほぼそのとおり。違うのは1点で、**ブラウザが認証器に渡すのは clientDataJSON そのものではなく、そのハッシュ**。認証器は challenge も origin も読めない。鍵を選ぶ・作る手がかりは、ブラウザが別に渡す RP ID。
+
+options の中身は、形を変えて戻ってくる。
+
+| options の項目 | 誰が使うか | 応答のどこに現れるか |
+| --- | --- | --- |
+| `challenge` | ブラウザ | clientDataJSON の中に、そのまま |
+| `rp.id` / `rpId` | ブラウザ（照合）、認証器（鍵の選択） | authenticatorData の先頭に、ハッシュで |
+| `userVerification` | 認証器（指紋・PIN） | authenticatorData のフラグ（UV） |
+| `user.id`（登録） | 認証器が鍵と一緒に覚える | ログインのときの userHandle |
+| `pubKeyCredParams`（登録） | 認証器が方式を選ぶ | 公開鍵（COSE）の中の `alg` |
+| `excludeCredentials`、`rp.name`、`user.name`、`timeout` | 認証器・ブラウザ | 現れない（使われるだけ） |
+
+auth が出した値は、ブラウザか認証器を通って戻ってきて、どれも署名の原文に入っている。サーバーは、自分が出した値と照らすだけでよい。誰が何を順に処理するかの文章は、`docs/steps/3-passkey.md` の「3. 流れ」の冒頭にある。
+
+**理解の確認**：届くものは「ブラウザが作る clientDataJSON」と「認証器が作る authenticatorData・署名」に分かれていて、認証器が clientDataJSON のハッシュに署名することで、両者が1つの署名で結び付く。

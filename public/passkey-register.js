@@ -29,11 +29,12 @@ form?.addEventListener('submit', async (e) => {
   try {
     // 登録 2 → 登録 3：サーバーに challenge 入りの options を作ってもらう
     const options = await post('/account/passkey/options');
-    // 登録 4 → 5 → 6：認証器に鍵ペアを作らせる（5 で指紋・PIN を求められる）。RP ID と今のページのドメインが合わなければ、ブラウザが断る
+    // 登録 3 のあとの Note：create を呼ぶと、ブラウザが RP ID を今のページのドメインと照らし（合わなければ断る）、clientDataJSON を作る
+    // 登録 4 → 5 → 6：ブラウザが認証器に鍵ペアを作らせる（5 で指紋・PIN を求められる）。終わるまで await で待つ
     const credential = await navigator.credentials.create({
       publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options),
     });
-    // 登録 6 のあとの Note：ブラウザが clientDataJSON（種類・challenge・origin）を作って添えている
+    // credential には、認証器の応答（attestationObject）と、ブラウザが作った clientDataJSON の両方が入っている
     // 登録 7：toJSON でまとめて base64url にし、サーバーへ送る。返事（登録 9）が来たら画面を読み直す
     await post('/account/passkey/verify', { credential: credential.toJSON(), name: form.elements.name.value });
     location.href = '/account?passkey=registered';
