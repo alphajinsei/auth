@@ -58,8 +58,9 @@
 - [x] 来歴：[OAuth 2.0 と OpenID Connect](notes/extra-history-oauth-oidc.md)（パスワードを渡していた時代、SAML、OpenID 2.0、OAuth 1.0 から）、JWT
 - [x] シーケンス図：[認可コード + PKCE、Discovery と JWKS、SSO、/userinfo](steps/4-oidc.md)
 - [x] 署名鍵、JWKS、Discovery（4-a。本番の鍵は `./tf.sh apply` のあと）
-- [ ] `/authorize`、同意画面（4-b で済み）、`/token`、`/userinfo`
-- [ ] demo-app を RP にして「auth でログイン」（まず手元で）
+- [x] `/authorize`、同意画面（4-b）、`/token`、`/userinfo`（4-c）
+- [x] demo-app を RP にして「auth でログイン」（まず手元で。4-d）
+- [ ] 本番に載せ、手元の demo-app から本番の auth でログインする（4-e）
 
 ## 段5：アクセストークンとリフレッシュトークン（D）
 

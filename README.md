@@ -45,6 +45,7 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | `src/send-test-mail.ts` | 試しに1通送る（`node dist/send-test-mail.js <宛先>`）。誰でも送らせられる口になるので、Web の API にはしない |
 | `src/migrate.ts` | マイグレーションを流す（デプロイのとき、コンテナの中で `node dist/migrate.js`） |
 | `migrations/` | drizzle-kit が作ったマイグレーションの SQL とスナップショット。手で書かない |
+| `demo-app/` | 「auth でログイン」を試す RP（Hono、ポート 4000、DB なし）。`src/rp.ts` が Discovery・JWKS・ID トークンの検証、`src/index.ts` が `/login`・`/callback`・トップの画面。設定は `demo-app/.env`（git に入らない。ひな形は `.env.example`）。本番には載せない |
 | `Dockerfile` | ビルドして `dist/` を作り、実行用のイメージに入れる |
 | `compose.yaml` | 本番と手元で共通。ポートは `.env` の `APP_PORT`（本番は台帳の 8002） |
 | `compose.override.yaml` | 手元だけ（自動で重なる）。HeatWave と同じ版の MySQL のコンテナと、メールの受け口の Mailpit、その接続情報 |
@@ -74,6 +75,14 @@ http://localhost:3000 を開き、上の利用者でログインする。ポー�
 docker compose up -d --build                     # app も MySQL もコンテナ。http://localhost:8002
 docker compose run --rm app node dist/migrate.js
 docker compose down                              # データは残る（消すなら down -v）
+```
+
+demo-app（「auth でログイン」を試す RP。[demo-app/](demo-app/)、段5で独立させるまでの仮住まい）：
+
+```bash
+npx tsx --env-file=local.env src/admin.ts create-client demo-app http://localhost:4000/callback "デモのアプリ"   # client_secret が一度だけ出る
+cp demo-app/.env.example demo-app/.env   # CLIENT_SECRET に上の値を入れる（.env は git に入らない）
+npm run demo                             # http://localhost:4000 → 「auth でログイン」
 ```
 
 - 手元で送ったメールを見る：`docker compose up -d mailpit` → `npx tsx --env-file=local.env src/send-test-mail.ts you@example.com` → http://localhost:8025（外へは出ない）

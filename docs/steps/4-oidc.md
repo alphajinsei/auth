@@ -157,7 +157,9 @@ sequenceDiagram
 
 | 手順 | 図の中身 | コード |
 | --- | --- | --- |
-| ログイン 1〜3 | demo-app が乱数を作り、/authorize へ送る | demo-app（4-d） |
+| ログイン 1〜2 | 「auth でログイン」→ GET /login | [demo-app/src/index.ts](../../demo-app/src/index.ts) の `GET /login` |
+| ログイン 2 のあとの Note | state、nonce、code_verifier を作り、Cookie に覚える | [demo-app/src/rp.ts](../../demo-app/src/rp.ts) の `newLoginRequest`。3つを JSON にして `__Host-demo-login` の Cookie へ（10分、`SameSite=Lax`） |
+| ログイン 3 | 302 → /authorize | `GET /login` の最後の `c.redirect`。URL は Discovery の `authorization_endpoint` |
 | ログイン 4 | GET /authorize | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `GET /authorize` |
 | ログイン 4 のあとの 1つ目の Note | client_id と redirect_uri を照らす | 同じファイルの `checkRequest`（要素②）。外れたら auth の画面にエラー（`authorizeErrorPage`）。そのあとの検査（response_type、openid、PKCE、state）の失敗は redirect_uri へ `error=` で返す |
 | ログイン 4 のあとの 2つ目の Note | ログインしていなければログイン画面へ | `currentUser` が空なら、[src/session.ts](../../src/session.ts) の `rememberReturnTo` で戻り先を Cookie に覚えて `/login` へ。ログインが済んだら `takeReturnTo` で戻る（パスワード、TOTP、パスキーのどれでも） |
@@ -166,13 +168,28 @@ sequenceDiagram
 | ログイン 7 のあとの Note | 認可コードを作る | `issueCode`（要素④） |
 | ログイン 8 | 認可コードを保存、同意を記録 | `db.insert(authorizationCodes)`、`db.insert(oauthConsents)` |
 | ログイン 9 | 302 → /callback（code、state） | `issueCode` の最後の `c.redirect` |
-| ログイン 10〜14 | /callback、/token、検証 | 4-c（auth）、4-d（demo-app） |
+| ログイン 10 | GET /callback（code、state） | [demo-app/src/index.ts](../../demo-app/src/index.ts) の `GET /callback`。`__Host-demo-login` を読んで消す（一度きり） |
+| ログイン 10 のあとの Note | state が Cookie の値と一致するか | `q.state !== login.state` なら 400。`error=` の戻りも、state を確かめてから信じる |
+| ログイン 11（demo-app の側） | POST /token | `exchangeCode`。`Authorization: Basic`（client_id と client_secret）、本文に code、redirect_uri、code_verifier |
+| ログイン 11 | POST /token | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `POST /token`。サーバー同士の通信で Origin が付かないので、[src/origin.ts](../../src/origin.ts) の Origin の確認から外している（Cookie を使わず、毎回 client_secret を見せるので CSRF の心配がない） |
+| ログイン 11 のあとの Note | client を認証する | `authenticateClient`。`Authorization: Basic` の client_id と client_secret を取り出し、SHA-256 を DB の `secret_hash` と `timingSafeEqual` で比べる。外れたら 401 `invalid_client` |
+| ログイン 12 | 認可コードを取り出して消す | `takeCode`。読んでから消し、消せた（`affectedRows === 1`）ときだけ使う。先に期限切れのコードを掃除する |
+| ログイン 12 のあとの 1つ目の Note | 期限、client_id、redirect_uri、PKCE | `POST /token` の中の `if` の並び。どれで外れても 400 `invalid_grant`。PKCE は `SHA-256(code_verifier)` の base64url を `code_challenge` と比べる（要素⑥） |
+| ログイン 12 のあとの 2つ目の Note | ID トークンを作って署名する | `signJwt({ iss, sub, aud, exp, iat, auth_time, nonce, amr, preferred_username })`（署名は [src/jwt.ts](../../src/jwt.ts)、要素⑧） |
+| ログイン 13 | ID トークン、アクセストークン | `c.json({ access_token, token_type: 'Bearer', expires_in, scope, id_token })`。アクセストークンは乱数で、SHA-256 を `access_tokens` に置く |
+| ログイン 13 のあとの Note | 署名と中身を確かめる | [demo-app/src/rp.ts](../../demo-app/src/rp.ts) の `verifyIdToken`：alg（ES256 だけ）、kid で鍵を選ぶ、署名、iss、aud、exp、iat、nonce の順。知らない kid なら JWKS を1回だけ取り直す（`verifyWithRefresh`）。続けて `/userinfo` を呼び、sub が一致するかも確かめる |
+| ログイン 14 | demo-app のセッションを作り、トップへ | 乱数のセッション ID を `__Host-demo-session` に置き、中身（ID トークンの中身と /userinfo の返事）はメモリの `Map` に。トップの画面に表示する |
 
 - **redirect_uri の完全一致**（ログイン 4 のあとの 1つ目の Note）。前方一致や、ワイルドカードを許すと、`https://demo.example.com/callback/../evil` のような抜け道で、コードを別の場所に送らせられる。登録した文字列と、1文字残らず同じであることを求める。
 - **redirect_uri を `/token` でもう一度送る**のは、コードを出したときの redirect_uri と同じかを auth が確かめるため（コードを別の client の流れに持ち込ませない）。
 - **同意は記録する**。同じ利用者・同じ client・同じ scope なら、次からは同意画面を出さない（「2つ目以降のログイン」）。
 - **ID トークンの amr** には、段1〜3で記録したセッションの amr（`pwd`、`pwd otp mfa`、`hwk mfa` など）をそのまま入れる。demo-app は、パスキーに一切触れずに「多要素でログインした」と分かる。
 - 断るときの扱い。redirect_uri が登録と違う、client_id が不明、のときは、**redirect_uri へ戻さず**、auth の画面にエラーを出す（偽の redirect_uri にエラーを送ると、それ自体が攻撃の足がかりになる）。それ以外（利用者が同意を断った、など）は、redirect_uri に `error=access_denied` と state を付けて戻す。
+- **`/token` の失敗は、どこで外れても `invalid_grant`**（コードが不明・使用済み、期限切れ、client 違い、redirect_uri 違い、PKCE 違い）。どこが違ったかを相手に教えない（`error_description` には書くが、auth のログで追うためのもの）。client の認証の失敗だけは 401 `invalid_client`。
+- **失敗してもコードは消える**。取り出した時点で消すので、PKCE を間違えたら、そのコードは二度と使えない（横取りした人が verifier を総当たりできない）。
+- **使い回しの検知はしていない**。仕様は「同じコードが2回来たら、1回目で出したトークンも取り消すべき」（RFC 6749 4.1.2）としているが、そのためには使ったコードと出したトークンの結び付きを残す必要がある。段4では、消すだけにする。
+- **寿命**。認可コード 60秒、ID トークン 10分（受け取ってすぐ確かめて使い終わるので、短くてよい）、アクセストークン 1時間。
+- **amr は配列**で入れる（RFC 8176。`"pwd otp mfa"` は `["pwd", "otp", "mfa"]` になる）。DB とセッションでは空白区切りの文字列で持っている。
 
 ### 準備：Discovery と JWKS（demo-app が起動するとき）
 
@@ -195,7 +212,8 @@ sequenceDiagram
 | --- | --- | --- |
 | 準備 1 → 2 | Discovery | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `GET /.well-known/openid-configuration` |
 | 準備 3 → 4 | JWKS | 同じファイルの `GET /jwks.json` → [src/jwt.ts](../../src/jwt.ts) の `jwks`（秘密鍵から公開鍵を作り、`kid` は公開鍵の指紋＝JWK Thumbprint） |
-| 準備 4 のあとの Note | 覚えておく | demo-app（4-d） |
+| 準備 1 → 4（demo-app の側） | Discovery、JWKS を取りに行く | [demo-app/src/rp.ts](../../demo-app/src/rp.ts) の `discover`（中身の issuer が、取りに行った issuer と同じかも確かめる）、`fetchJwks` |
+| 準備 4 のあとの Note | 覚えておく | [demo-app/src/index.ts](../../demo-app/src/index.ts) の `config`。起動のときではなく、最初のログインのときに取りに行く（auth が止まっていても demo-app は起動できる） |
 
 - demo-app に渡す設定は、auth の URL（issuer）と、client_id、client_secret の3つだけ。各 URL は Discovery から読む。
 - 公開鍵は秘密ではないので、誰でも取れる。署名に使う秘密鍵は auth だけが持つ（Vault に置く。5 の「決めること」）。
@@ -235,6 +253,15 @@ sequenceDiagram
   Note over A: 期限内か。scope に openid があるか
   A-->>R: sub、preferred_username（scope の profile による）
 ```
+
+#### 図「/userinfo」とコードの対応
+
+| 手順 | 図の中身 | コード |
+| --- | --- | --- |
+| /userinfo 1 | GET /userinfo（Bearer） | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `GET /userinfo`。`Authorization: Bearer` がなければ 401 |
+| /userinfo 2 | トークンから利用者と scope を引く | `access_tokens` と `users` を結合して、トークンの SHA-256 で引く |
+| /userinfo 2 のあとの Note | 期限、scope | 期限切れ・不明は 401 `invalid_token`（`WWW-Authenticate: Bearer error="invalid_token"`）、openid がなければ 403 `insufficient_scope` |
+| /userinfo 3 | sub、preferred_username | `c.json({ sub, preferred_username })`。sub は ID トークンと同じ値 |
 
 段4では、アクセストークンを「DB で引く乱数」にする（セッション ID と同じ形）。段5で、JWT にして API が自分で検証する形（DB を引かない）と比べる。
 

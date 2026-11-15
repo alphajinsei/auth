@@ -43,6 +43,13 @@
       "when": 1794707786799,
       "tag": "0005_oidc",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1794754125231,
+      "tag": "0006_access_tokens",
+      "breakpoints": true
     }
   ]
 }

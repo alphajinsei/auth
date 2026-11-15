@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "db:init": "bash scripts/db-init.sh",
     "deploy": "bash scripts/deploy.sh",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "demo": "tsx watch --env-file=demo-app/.env demo-app/src/index.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",

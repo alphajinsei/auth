@@ -1,12 +1,12 @@
 // OIDC の OP（auth）として公開する URL。流れ：docs/steps/4-oidc.md
 // 番号の読み方は src/webauthn.ts と同じ（「ログイン 4」＝ 4-oidc.md の図「ログイン」の 4 番の矢印、「要素②」＝「1. 技術の要素」の ②）
-// 4-a：Discovery と JWKS（図「準備」）。4-b：/authorize（図「ログイン」の 4〜9）。/token、/userinfo は 4-c
-import { createHash, randomBytes } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+// 4-a：Discovery と JWKS（図「準備」）。4-b：/authorize（図「ログイン」の 4〜9）。4-c：/token（ログイン 11〜12）、/userinfo（図「/userinfo」）
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { and, eq, lt } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { db } from '../db/client.js';
-import { authorizationCodes, oauthClients, oauthConsents } from '../db/schema.js';
-import { jwks } from '../jwt.js';
+import { accessTokens, authorizationCodes, oauthClients, oauthConsents, users } from '../db/schema.js';
+import { jwks, signJwt } from '../jwt.js';
 import { currentUser, rememberReturnTo } from '../session.js';
 import { authorizeErrorPage, consentPage } from '../views.js';
 
@@ -180,4 +180,140 @@ oidc.post('/authorize', async (c) => {
 		.values({ userId: user.id, clientId: req.clientId, scope: req.scope })
 		.onDuplicateKeyUpdate({ set: { scope: req.scope } });
 	return issueCode(c, req, user);
+});
+
+// ---- /token（図「ログイン」の 11〜12）。demo-app のサーバーから、裏の通信で呼ばれる ----
+
+const ID_TOKEN_TTL_S = 10 * 60; // ID トークンは受け取った直後に確かめて使い終わるので、短くてよい
+const ACCESS_TOKEN_TTL_S = 60 * 60;
+
+// /token のエラー。形は OAuth 2.0 の決まり（RFC 6749 5.2）：JSON で { error, error_description }
+function tokenError(c: Context, error: string, description: string, status: 400 | 401 = 400) {
+	audit('token_error', { error, description });
+	// invalid_client で 401 を返すときは、どの方式で認証してほしいかを WWW-Authenticate で示す
+	if (status === 401) c.header('WWW-Authenticate', 'Basic realm="auth"');
+	return c.json({ error, error_description: description }, status);
+}
+
+// ログイン 11 のあとの Note：client を認証する（client_secret_basic）。
+// Authorization: Basic base64(client_id:client_secret)。どちらも URL エンコードしてから「:」でつなぐ決まり（RFC 6749 2.3.1）
+async function authenticateClient(c: Context) {
+	const header = c.req.header('authorization') ?? '';
+	if (!header.startsWith('Basic ')) return null;
+	const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+	const colon = decoded.indexOf(':');
+	if (colon < 0) return null;
+	const id = decodeURIComponent(decoded.slice(0, colon));
+	const secret = decodeURIComponent(decoded.slice(colon + 1));
+	const [client] = await db.select().from(oauthClients).where(eq(oauthClients.id, id));
+	if (!client) return null;
+	// ハッシュ同士を、かかる時間が中身によらない比べ方で比べる（1文字目から順に比べて途中で止まると、時間の差から推測されうる）
+	const ok = timingSafeEqual(Buffer.from(sha256hex(secret)), Buffer.from(client.secretHash));
+	return ok ? client : null;
+}
+
+// ログイン 12：認可コードを取り出して消す（一度きり。要素④）。
+// 先に読んで、消せたときだけ使う。同じコードで同時に2つ来ても、消せる（affectedRows が 1 になる）のは片方だけ
+async function takeCode(code: string) {
+	const [row] = await db.select().from(authorizationCodes).where(eq(authorizationCodes.codeHash, sha256hex(code)));
+	if (!row) return null;
+	const [res] = await db.delete(authorizationCodes).where(eq(authorizationCodes.codeHash, row.codeHash));
+	return res.affectedRows === 1 ? row : null;
+}
+
+const toSeconds = (d: Date) => Math.floor(d.getTime() / 1000);
+
+// ログイン 11：POST /token
+oidc.post('/token', async (c) => {
+	const client = await authenticateClient(c);
+	if (!client) return tokenError(c, 'invalid_client', 'client authentication failed', 401);
+
+	const body = (await c.req.parseBody()) as Record<string, string>;
+	if (body.grant_type !== 'authorization_code') return tokenError(c, 'unsupported_grant_type', 'only authorization_code');
+
+	// 期限の切れたコードを、ついでに掃除する（ここまで来る client は認証済みなので、掃除を外から好きなだけ走らせられない）
+	await db.delete(authorizationCodes).where(lt(authorizationCodes.expiresAt, new Date()));
+
+	const row = await takeCode(body.code ?? '');
+	// ログイン 12 のあとの 1つ目の Note：コードの期限、client_id、redirect_uri が、/authorize のときと一致するか。
+	// どれで外れても同じ invalid_grant を返す（どこが違ったかを、相手に教えない）
+	if (!row) return tokenError(c, 'invalid_grant', 'unknown or used code');
+	// 期限切れは、ふつうは直前の掃除で消えていて「unknown」になる。ここは掃除と取り出しの間に切れた場合の備え
+	if (row.expiresAt < new Date()) return tokenError(c, 'invalid_grant', 'code expired');
+	if (row.clientId !== client.id) return tokenError(c, 'invalid_grant', 'code was issued to another client');
+	if (row.redirectUri !== body.redirect_uri) return tokenError(c, 'invalid_grant', 'redirect_uri mismatch');
+
+	// 同じ Note の続き：PKCE（要素⑥）。SHA-256（code_verifier）の base64url が、/authorize で受けた code_challenge と一致するか。
+	// code_verifier は 43〜128文字（RFC 7636 4.1）。コードを横取りしただけの人は、元の乱数（verifier）を知らないので、ここで止まる
+	const verifier = body.code_verifier ?? '';
+	if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) return tokenError(c, 'invalid_grant', 'bad code_verifier');
+	if (createHash('sha256').update(verifier).digest('base64url') !== row.codeChallenge) {
+		return tokenError(c, 'invalid_grant', 'PKCE verification failed');
+	}
+
+	const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, row.userId));
+	if (!user) return tokenError(c, 'invalid_grant', 'user no longer exists');
+	const scopes = row.scope.split(' ');
+	const now = Math.floor(Date.now() / 1000);
+
+	// ログイン 12 のあとの 2つ目の Note：ID トークンを作り、秘密鍵で署名する（要素⑧）
+	const idToken = signJwt({
+		iss: issuer, // 誰が出したか。demo-app は Discovery で知った issuer と比べる
+		sub: row.userId, // 利用者の ID。ユーザー名と違って変わらないので、RP はこれで利用者を見分ける
+		aud: client.id, // 誰に宛てたか。別の RP 宛ての ID トークンを使い回させない
+		exp: now + ID_TOKEN_TTL_S,
+		iat: now,
+		auth_time: toSeconds(row.authTime), // 実際にログインした時刻（SSO の2回目は、最初の時刻のまま）
+		...(row.nonce ? { nonce: row.nonce } : {}), // 要素⑨：/authorize で受けた値をそのまま返す
+		amr: row.amr.split(' '), // RFC 8176 では配列。例：["hwk", "mfa"]
+		...(scopes.includes('profile') ? { preferred_username: user.username } : {}),
+	});
+
+	// アクセストークン（/userinfo を呼ぶ許可証）。段4は乱数を DB で引く形
+	const accessToken = randomBytes(32).toString('base64url');
+	await db.delete(accessTokens).where(lt(accessTokens.expiresAt, new Date()));
+	await db.insert(accessTokens).values({
+		tokenHash: sha256hex(accessToken),
+		clientId: client.id,
+		userId: row.userId,
+		scope: row.scope,
+		expiresAt: new Date((now + ACCESS_TOKEN_TTL_S) * 1000),
+	});
+
+	audit('token_issued', { clientId: client.id, userId: row.userId });
+	// ログイン 13：返事の形は OAuth 2.0（access_token、token_type、expires_in）に、OIDC が id_token を足したもの
+	return c.json({
+		access_token: accessToken,
+		token_type: 'Bearer',
+		expires_in: ACCESS_TOKEN_TTL_S,
+		scope: row.scope,
+		id_token: idToken,
+	});
+});
+
+// ---- /userinfo（図「/userinfo」）。アクセストークンを見せれば、利用者の情報を返す ----
+// 「Bearer」＝持参人。トークンを持っている人なら誰でも使える（盗まれたら使われる。だから短命で、TLS の上だけで送る）
+
+function bearerError(c: Context, description: string) {
+	// RFC 6750 3.1：トークンが不正なときは 401 と、WWW-Authenticate で理由を返す
+	c.header('WWW-Authenticate', `Bearer error="invalid_token", error_description="${description}"`);
+	return c.json({ error: 'invalid_token', error_description: description }, 401);
+}
+
+oidc.get('/userinfo', async (c) => {
+	const header = c.req.header('authorization') ?? '';
+	if (!header.startsWith('Bearer ')) return bearerError(c, 'missing bearer token');
+	// /userinfo 1 → 2：トークンの SHA-256 から、利用者と scope を引く
+	const [row] = await db
+		.select({ userId: accessTokens.userId, scope: accessTokens.scope, expiresAt: accessTokens.expiresAt, username: users.username })
+		.from(accessTokens)
+		.innerJoin(users, eq(users.id, accessTokens.userId))
+		.where(eq(accessTokens.tokenHash, sha256hex(header.slice(7))));
+	// /userinfo 2 のあとの Note：期限内か。scope に openid があるか
+	if (!row || row.expiresAt < new Date()) return bearerError(c, 'unknown or expired token');
+	const scopes = row.scope.split(' ');
+	if (!scopes.includes('openid')) return c.json({ error: 'insufficient_scope' }, 403);
+
+	// /userinfo 3：sub は ID トークンと同じ値。RP は「ID トークンの sub と一致するか」を確かめる決まり（OIDC Core 5.3.2）
+	return c.json({ sub: row.userId, ...(scopes.includes('profile') ? { preferred_username: row.username } : {}) });
 });
