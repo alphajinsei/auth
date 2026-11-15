@@ -55,7 +55,7 @@
 
 ## 段4：OIDC（C・D）
 
-- [ ] 来歴：OAuth 2.0 と OIDC（パスワードを渡していた時代、OAuth 1.0、SAML、OpenID 2.0 から）、JWT
+- [x] 来歴：[OAuth 2.0 と OpenID Connect](notes/extra-history-oauth-oidc.md)（パスワードを渡していた時代、SAML、OpenID 2.0、OAuth 1.0 から）、JWT
 - [ ] シーケンス図：認可コード + PKCE
 - [ ] 署名鍵、JWKS、Discovery
 - [ ] `/authorize`、同意画面、`/token`、`/userinfo`
@@ -67,6 +67,7 @@
 - [ ] `/userinfo` がアクセストークン（JWT）と scope を検証する
 - [ ] リフレッシュトークンの取り替えと失効
 - [ ] demo-app を独立したリポジトリにし、共通基盤に載せる（今後のサービスのひな形）
+- [ ] 認可モデル（E）を小さく：auth がロールを渡し、demo-app がそれを見て、してよい操作を判断する
 
 ## 段6：LDAP（F。学習のみ）
 
