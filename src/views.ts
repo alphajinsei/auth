@@ -41,33 +41,53 @@ const amrLabel: Record<string, string> = {
 	otp: 'TOTP（ワンタイムパスワード）',
 	swk: 'パスキー（同期される鍵）',
 	hwk: 'パスキー（端末に固定の鍵）',
+	mfa: '多要素',
 };
 
-export type PasskeyRow = { name: string; createdAt: Date; lastUsedAt: Date | null };
+export type PasskeyRow = { id: string; name: string; createdAt: Date; lastUsedAt: Date | null };
 
 // 日時は利用者の地域に関わらず、日本時間で出す（個人のサービスなので）
 const jst = (d: Date) => d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', dateStyle: 'short', timeStyle: 'short' });
 
-export const accountPage = (username: string, amr: string, totp: TotpStatus, passkeys: PasskeyRow[], notice?: string) =>
+// アカウントの画面。登録している認証の手段（パスワード、TOTP、パスキー）を並べる
+export const accountPage = (a: {
+	username: string;
+	amr: string;
+	hasPassword: boolean;
+	totp: TotpStatus;
+	passkeys: PasskeyRow[];
+	notice?: string;
+}) =>
 	layout(
 		'アカウント',
 		html`
-    ${notice ? html`<p class="notice">${notice}</p>` : ''}
-    <p>ログイン中：<strong>${username}</strong></p>
-    <p>このセッションのログイン方法：${amr.split(' ').map((m) => amrLabel[m] ?? m).join(' + ')}（amr: <code>${amr}</code>）</p>
+    ${a.notice ? html`<p class="notice">${a.notice}</p>` : ''}
+    <p>ログイン中：<strong>${a.username}</strong></p>
+    <p>このセッションのログイン方法：${a.amr.split(' ').map((m) => amrLabel[m] ?? m).join(' + ')}（amr: <code>${a.amr}</code>）</p>
 
-    <h2>2段階認証（TOTP）</h2>
-    ${totp === 'enabled'
-			? html`<p>有効。ログインのとき、パスワードのあとに認証アプリの6桁を求めます。</p>
+    <h2>パスワード</h2>
+    ${!a.hasPassword
+			? html`<p>なし（パスキーだけのアカウント）。</p>`
+			: a.passkeys.length
+				? html`<p>あり。パスキーがあるので、パスワードを削除してパスキーだけのアカウントにできます（TOTP も一緒に削除します）。</p>
+          <form method="post" action="/account/password/delete"><button class="secondary">パスワードを削除</button></form>`
+				: html`<p>あり。パスキーを登録すると、パスワードを削除できます。</p>`}
+
+    ${a.hasPassword
+			? html`<h2>2段階認証（TOTP）</h2>
+    ${a.totp === 'enabled'
+				? html`<p>有効。ログインのとき、パスワードのあとに認証アプリの6桁を求めます。</p>
         <form method="post" action="/account/totp/delete"><button class="secondary">TOTP を削除</button></form>`
-			: html`<p>${totp === 'pending' ? '登録の途中です（確認の6桁がまだ）。' : '未登録。'}</p>
-        <form method="post" action="/account/totp/setup"><button>TOTP を登録</button></form>`}
+				: html`<p>${a.totp === 'pending' ? '登録の途中です（確認の6桁がまだ）。' : '未登録。'}</p>
+        <form method="post" action="/account/totp/setup"><button>TOTP を登録</button></form>`}`
+			: ''}
 
     <h2>パスキー</h2>
-    ${passkeys.length
+    ${a.passkeys.length
 			? html`<ul class="passkeys">
-          ${passkeys.map(
-						(p) => html`<li><strong>${p.name}</strong><br><small>登録 ${jst(p.createdAt)}・最後に使った ${p.lastUsedAt ? jst(p.lastUsedAt) : 'まだ'}</small></li>`,
+          ${a.passkeys.map(
+						(p) => html`<li><strong>${p.name}</strong><br><small>登録 ${jst(p.createdAt)}・最後に使った ${p.lastUsedAt ? jst(p.lastUsedAt) : 'まだ'}</small>
+            <form method="post" action="/account/passkey/delete"><input type="hidden" name="id" value="${p.id}"><button class="secondary small">削除</button></form></li>`,
 					)}
         </ul>`
 			: html`<p>未登録。</p>`}

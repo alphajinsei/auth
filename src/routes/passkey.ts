@@ -1,16 +1,16 @@
 // パスキーの登録（アカウントの画面から）とログイン（ログイン画面から）。流れ：docs/steps/3-passkey.md の図「登録」「ログイン」
-// 並び：前半が部品（challenge の発行と取り出し）、後半がルート（登録、ログインの順。それぞれ図の順）
+// 並び：前半が部品（challenge の発行と取り出し）、後半がルート（登録、ログインの順。それぞれ図の順）、最後に削除（3-c）
 // 番号の読み方
 //   「登録 7」   ＝ 図「登録」の 7 番の矢印（図の丸数字。Note には番号がないので「登録 7 のあとの Note」と書く）
 //   「ログイン 7」＝ 図「ログイン」の 7 番の矢印
 //   「要素③」   ＝ 「1. 技術の要素」の表の ③
 // どの関数が図のどこに当たるかの一覧は、文書の各図の下の「図とコードの対応」の表
 import { createHash, randomBytes } from 'node:crypto';
-import { eq, lt } from 'drizzle-orm';
+import { and, count, eq, lt } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { db } from '../db/client.js';
-import { users, webauthnChallenges, webauthnCredentials } from '../db/schema.js';
+import { totpCredentials, users, webauthnChallenges, webauthnCredentials } from '../db/schema.js';
 import { currentUser, startSession } from '../session.js';
 import { authenticationOptions, newChallenge, registrationOptions, verifyAuthentication, verifyRegistration } from '../webauthn.js';
 
@@ -138,18 +138,65 @@ passkey.post('/login/passkey/verify', async (c) => {
 		.set({ signCount: result.signCount, lastUsedAt: new Date() })
 		.where(eq(webauthnCredentials.id, credentialId));
 	// amr（RFC 8176）：鍵を持っていることの証明。同期される鍵は swk（ソフトウェアの鍵）、端末に固定の鍵は hwk（ハードウェアの鍵）。
-	// 指紋・PIN（ユーザー検証）の分をどう表すかは 3-c で決める
-	await startSession(c, cred.userId, 'full', result.synced ? 'swk' : 'hwk');
+	// それに mfa（多要素）を足す：ユーザー検証（UV）を必須にしたので、鍵（所持）＋ 指紋か PIN（生体か知識）の2要素になっている。
+	// 指紋か PIN かは、認証器が教えてくれない（UV のフラグは「どちらかで確かめた」だけ）ので、fpt や pin は付けない
+	await startSession(c, cred.userId, 'full', `${result.synced ? 'swk' : 'hwk'} mfa`);
 	audit('passkey_login_ok', { username: cred.username });
 
 	// ログイン 10：Set-Cookie（startSession が付けた）と、行き先
 	return c.json({ ok: true, redirect: '/account' });
 });
 
+// ---- パスキーだけのアカウントと、削除（3-c）。図はない（ログイン中の利用者が、自分の行を消すだけ） ----
+
+// どの方法でもログインできない状態（パスワードもパスキーもない）にしないよう、確かめてから消す。
+// 確かめてから消すまでの間に、別のタブから「パスキーを削除」が同時に来ると、両方とも「もう一方が残る」と判断して
+// 両方消してしまう。利用者の行を FOR UPDATE でロックし、同じ利用者の削除を1つずつ順に処理する
+async function withUserLocked<T>(userId: string, fn: (tx: any, user: { passwordHash: string | null; passkeys: number }) => Promise<T>) {
+	return db.transaction(async (tx) => {
+		const [user] = await tx.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, userId)).for('update');
+		const [{ n }] = await tx.select({ n: count() }).from(webauthnCredentials).where(eq(webauthnCredentials.userId, userId));
+		return fn(tx, { passwordHash: user.passwordHash, passkeys: n });
+	});
+}
+
+// パスワードを削除して、パスキーだけのアカウントにする。パスキーが1つ以上あるときだけ。
+// TOTP も一緒に消す：TOTP はパスワードのあとの2要素目で、パスワードがなければ使い道がない
+passkey.post('/account/password/delete', async (c) => {
+	const user = await currentUser(c);
+	if (!user) return c.redirect('/login', 303);
+	const done = await withUserLocked(user.id, async (tx, u) => {
+		if (u.passkeys === 0 || u.passwordHash === null) return false;
+		await tx.update(users).set({ passwordHash: null }).where(eq(users.id, user.id));
+		await tx.delete(totpCredentials).where(eq(totpCredentials.userId, user.id));
+		return true;
+	});
+	if (!done) return c.redirect('/account', 303);
+	audit('password_deleted', { username: user.username });
+	return c.redirect('/account?password=deleted', 303);
+});
+
+// パスキーを1つ削除する。パスワードがなく、これが最後の1つなら断る（ログインできなくなるため）
+passkey.post('/account/passkey/delete', async (c) => {
+	const user = await currentUser(c);
+	if (!user) return c.redirect('/login', 303);
+	const id = String((await c.req.parseBody()).id ?? '');
+	const result = await withUserLocked(user.id, async (tx, u) => {
+		if (u.passwordHash === null && u.passkeys <= 1) return 'last';
+		// user_id も条件に入れる：ほかの人の鍵の ID を送られても消さない
+		const [res] = await tx
+			.delete(webauthnCredentials)
+			.where(and(eq(webauthnCredentials.id, id), eq(webauthnCredentials.userId, user.id)));
+		return res.affectedRows === 1 ? 'deleted' : 'none';
+	});
+	if (result === 'deleted') audit('passkey_deleted', { username: user.username });
+	return c.redirect(`/account?passkey=${result === 'last' ? 'last' : 'deleted'}`, 303);
+});
+
 // アカウントの画面に出す一覧
 export const listPasskeys = (userId: string) =>
 	db
-		.select({ name: webauthnCredentials.name, createdAt: webauthnCredentials.createdAt, lastUsedAt: webauthnCredentials.lastUsedAt })
+		.select({ id: webauthnCredentials.id, name: webauthnCredentials.name, createdAt: webauthnCredentials.createdAt, lastUsedAt: webauthnCredentials.lastUsedAt })
 		.from(webauthnCredentials)
 		.where(eq(webauthnCredentials.userId, userId))
 		.orderBy(webauthnCredentials.createdAt);

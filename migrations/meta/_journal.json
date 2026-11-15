@@ -29,6 +29,13 @@
       "when": 1794585246938,
       "tag": "0003_webauthn",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1794700594786,
+      "tag": "0004_password_nullable",
+      "breakpoints": true
     }
   ]
 }

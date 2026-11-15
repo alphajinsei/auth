@@ -39,14 +39,18 @@ async function readPassword(prompt: string): Promise<string> {
 	});
 }
 
+// NIST SP 800-63B：文字種の強制はせず、長さだけを求める
+async function readNewPassword() {
+	const password = await readPassword('password: ');
+	if (password.length < 12) throw new Error('password must be at least 12 characters');
+	return password;
+}
+
 async function createUser(username: string) {
 	const [existing] = await db.select().from(users).where(eq(users.username, username));
 	if (existing) throw new Error(`user "${username}" already exists`);
 
-	const password = await readPassword('password: ');
-	// NIST SP 800-63B：文字種の強制はせず、長さだけを求める
-	if (password.length < 12) throw new Error('password must be at least 12 characters');
-
+	const password = await readNewPassword();
 	const id = randomUUID();
 	await db.insert(users).values({ id, username, passwordHash: await hashPassword(password) });
 	console.log(`created user "${username}" (id ${id})`);
@@ -59,12 +63,25 @@ async function unlockUser(username: string) {
 	console.log(`unlocked user "${username}"`);
 }
 
+// パスワードを設定し直す。パスキーだけの利用者が端末を全部なくしたときの回復の手段（段3-c）。
+// 設定したパスワードは、利用者に別の経路（対面など）で渡す。ログインしたら、新しいパスキーを登録してもらう
+async function setPassword(username: string) {
+	const password = await readNewPassword();
+	const [result] = await db
+		.update(users)
+		.set({ passwordHash: await hashPassword(password), failedCount: 0, lockedUntil: null })
+		.where(eq(users.username, username));
+	if (result.affectedRows === 0) throw new Error(`user "${username}" not found`);
+	console.log(`set password for "${username}"`);
+}
+
 const [command, ...args] = process.argv.slice(2);
 try {
 	if (command === 'create-user' && args[0]) await createUser(args[0]);
 	else if (command === 'unlock' && args[0]) await unlockUser(args[0]);
+	else if (command === 'set-password' && args[0]) await setPassword(args[0]);
 	else {
-		console.error('usage: admin create-user <username> | admin unlock <username>');
+		console.error('usage: admin create-user <username> | admin unlock <username> | admin set-password <username>');
 		process.exitCode = 1;
 	}
 } catch (e) {

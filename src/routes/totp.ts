@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import QRCode from 'qrcode';
 import { db } from '../db/client.js';
-import { totpCredentials } from '../db/schema.js';
+import { totpCredentials, users } from '../db/schema.js';
 import { open, seal } from '../secretbox.js';
 import { currentUser } from '../session.js';
 import { base32, generateSecret, otpauthUri, verifyTotp } from '../totp.js';
@@ -24,6 +24,10 @@ async function renderSetup(secret: Buffer, username: string, error?: string) {
 totp.post('/account/totp/setup', async (c) => {
 	const user = await currentUser(c);
 	if (!user) return c.redirect('/login', 303);
+
+	// パスワードのない（パスキーだけの）アカウントには、TOTP を付けない（パスワードのあとの2要素目なので）
+	const [row] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, user.id));
+	if (row.passwordHash === null) return c.redirect('/account', 303);
 
 	const [existing] = await db.select().from(totpCredentials).where(eq(totpCredentials.userId, user.id));
 	if (existing?.confirmedAt) return c.redirect('/account', 303); // 有効なものは、削除してから登録し直す

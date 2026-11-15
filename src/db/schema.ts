@@ -6,7 +6,8 @@ export const users = mysqlTable('users', {
 	id: varchar('id', { length: 36 }).primaryKey(),
 	username: varchar('username', { length: 64 }).notNull().unique(),
 	// Argon2id のハッシュ。アルゴリズム・パラメータ・ソルトも中に入っている（$argon2id$v=19$m=...,t=...,p=...$ソルト$ハッシュ）
-	passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+	// 空ならパスワードなし（パスキーだけのアカウント。段3-c）
+	passwordHash: varchar('password_hash', { length: 255 }),
 	// 連続して失敗した回数と、止めている期限（段1-c）
 	failedCount: int('failed_count').notNull().default(0),
 	lockedUntil: datetime('locked_until'),

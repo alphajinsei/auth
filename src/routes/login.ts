@@ -60,7 +60,11 @@ login.post('/login', async (c) => {
 		return fail(); // どの理由でも、画面には同じことしか言わない。理由はログにだけ残す
 	}
 
-	if (!(await verifyPassword(user.passwordHash, password))) {
+	// パスワードを削除した（パスキーだけの）利用者も、捨てのハッシュで同じだけ時間をかけ、パスワード違いと同じに扱う
+	const ok = user.passwordHash
+		? await verifyPassword(user.passwordHash, password)
+		: (await verifyPassword(dummyHash, password), false);
+	if (!ok) {
 		await recordFailure(user.id);
 		audit('login_bad_password', username);
 		return fail();
@@ -126,7 +130,8 @@ login.post('/login/totp', async (c) => {
 	await db.update(users).set({ failedCount: 0, lockedUntil: null }).where(eq(users.id, user.id));
 	audit('login_ok', user.username);
 	// 仮のセッションを捨て、新しい ID で本物のセッションを作る（権限が上がる瞬間に ID を作り直す）
-	await startSession(c, user.id, 'full', 'pwd otp');
+	// mfa：複数の要素を使った（RFC 8176）。パスキーのログインと並べて「多要素か」を1つの値で見られるように
+	await startSession(c, user.id, 'full', 'pwd otp mfa');
 	return c.redirect('/account', 303);
 });
 
@@ -137,13 +142,19 @@ login.get('/account', async (c) => {
 	const [cred] = await db.select().from(totpCredentials).where(eq(totpCredentials.userId, user.id));
 	const totp = !cred ? 'none' : cred.confirmedAt ? 'enabled' : 'pending';
 	const passkeys = await listPasskeys(user.id);
+	const [row] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, user.id));
 	const notices: Record<string, string> = {
 		'totp=enabled': 'TOTP を有効にしました',
 		'totp=deleted': 'TOTP を削除しました',
 		'passkey=registered': 'パスキーを登録しました',
+		'passkey=deleted': 'パスキーを削除しました',
+		'passkey=last': 'パスワードがないので、最後のパスキーは削除できません',
+		'password=deleted': 'パスワードを削除しました。これからはパスキーでログインします',
 	};
 	const [key] = Object.entries(c.req.query()).map(([k, v]) => `${k}=${v}`);
-	return c.html(accountPage(user.username, user.amr, totp, passkeys, notices[key ?? '']));
+	return c.html(
+		accountPage({ username: user.username, amr: user.amr, hasPassword: row.passwordHash !== null, totp, passkeys, notice: notices[key ?? ''] }),
+	);
 });
 
 // GET にしない：<img src=".../logout"> を置くだけで、よそのサイトから勝手にログアウトさせられるため

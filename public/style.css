@@ -13,3 +13,4 @@ code { word-break: break-all; }
 ul.passkeys { padding-left: 1.2em; }
 ul.passkeys li { margin-bottom: 8px; }
 .or { text-align: center; color: #666; margin: 16px 0; }
+button.small { width: auto; padding: 4px 12px; font-size: .85rem; margin-top: 4px; }
