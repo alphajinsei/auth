@@ -1,4 +1,4 @@
-import { bigint, datetime, int, mysqlTable, text, timestamp, varchar } from 'drizzle-orm/mysql-core';
+import { bigint, datetime, int, mysqlTable, primaryKey, text, timestamp, varchar } from 'drizzle-orm/mysql-core';
 
 // 利用者。登録の画面はなく、管理用のコマンド（src/admin.ts）で作る
 export const users = mysqlTable('users', {
@@ -70,3 +70,50 @@ export const webauthnChallenges = mysqlTable('webauthn_challenges', {
 	userId: varchar('user_id', { length: 36 }).references(() => users.id, { onDelete: 'cascade' }),
 	expiresAt: datetime('expires_at').notNull(),
 });
+
+// ---- OIDC（段4）。流れ：docs/steps/4-oidc.md ----
+
+// 登録した RP（client）。管理用のコマンド（admin create-client）で作る
+export const oauthClients = mysqlTable('oauth_clients', {
+	id: varchar('id', { length: 64 }).primaryKey(), // client_id
+	// client_secret の SHA-256（16進）。secret は登録のときに一度だけ表示し、ここには置かない
+	secretHash: varchar('secret_hash', { length: 64 }).notNull(),
+	name: varchar('name', { length: 64 }).notNull(), // 同意画面に出す名前
+	// 登録した redirect_uri（JSON の配列）。/authorize と /token で、完全一致で照らす（要素②）
+	redirectUris: text('redirect_uris').notNull(),
+	createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// 認可コード（60秒、一度きり。要素④）。/authorize で決まったことを全部ここに結び付け、/token で引き換える
+export const authorizationCodes = mysqlTable('authorization_codes', {
+	codeHash: varchar('code_hash', { length: 64 }).primaryKey(), // コードの SHA-256。コードそのものは置かない
+	clientId: varchar('client_id', { length: 64 })
+		.notNull()
+		.references(() => oauthClients.id, { onDelete: 'cascade' }),
+	userId: varchar('user_id', { length: 36 })
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	redirectUri: varchar('redirect_uri', { length: 512 }).notNull(),
+	scope: varchar('scope', { length: 255 }).notNull(),
+	codeChallenge: varchar('code_challenge', { length: 64 }).notNull(), // PKCE（要素⑥）。SHA-256 の base64url は43文字
+	nonce: varchar('nonce', { length: 255 }), // 要素⑨。ID トークンにそのまま入れる
+	amr: varchar('amr', { length: 64 }).notNull(), // セッションの amr を写す
+	authTime: datetime('auth_time').notNull(), // 利用者が auth で実際にログインした時刻（セッションを作った時刻）
+	expiresAt: datetime('expires_at').notNull(),
+});
+
+// 同意の記録（要素③）。同じ利用者・同じ client で、求める scope が記録の範囲に収まれば、同意画面を出さない
+export const oauthConsents = mysqlTable(
+	'oauth_consents',
+	{
+		userId: varchar('user_id', { length: 36 })
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		clientId: varchar('client_id', { length: 64 })
+			.notNull()
+			.references(() => oauthClients.id, { onDelete: 'cascade' }),
+		scope: varchar('scope', { length: 255 }).notNull(), // 同意した scope（空白区切り）
+		createdAt: timestamp('created_at').notNull().defaultNow(),
+	},
+	(t) => [primaryKey({ columns: [t.userId, t.clientId] })],
+);

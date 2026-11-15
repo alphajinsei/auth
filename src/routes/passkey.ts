@@ -11,7 +11,7 @@ import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { db } from '../db/client.js';
 import { totpCredentials, users, webauthnChallenges, webauthnCredentials } from '../db/schema.js';
-import { currentUser, startSession } from '../session.js';
+import { currentUser, startSession, takeReturnTo } from '../session.js';
 import { authenticationOptions, newChallenge, registrationOptions, verifyAuthentication, verifyRegistration } from '../webauthn.js';
 
 export const passkey = new Hono();
@@ -144,7 +144,7 @@ passkey.post('/login/passkey/verify', async (c) => {
 	audit('passkey_login_ok', { username: cred.username });
 
 	// ログイン 10：Set-Cookie（startSession が付けた）と、行き先
-	return c.json({ ok: true, redirect: '/account' });
+	return c.json({ ok: true, redirect: takeReturnTo(c) });
 });
 
 // ---- パスキーだけのアカウントと、削除（3-c）。図はない（ログイン中の利用者が、自分の行を消すだけ） ----

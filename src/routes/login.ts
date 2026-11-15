@@ -6,7 +6,7 @@ import { db } from '../db/client.js';
 import { totpCredentials, users } from '../db/schema.js';
 import { hashPassword, verifyPassword } from '../password.js';
 import { open } from '../secretbox.js';
-import { currentUser, endSession, pendingUser, startSession } from '../session.js';
+import { currentUser, endSession, pendingUser, startSession, takeReturnTo } from '../session.js';
 import { verifyTotp } from '../totp.js';
 import { accountPage, loginPage, totpLoginPage } from '../views.js';
 import { listPasskeys } from './passkey.js';
@@ -83,8 +83,9 @@ login.post('/login', async (c) => {
 	await db.update(users).set({ failedCount: 0, lockedUntil: null }).where(eq(users.id, user.id));
 	audit('login_ok', username);
 	await startSession(c, user.id, 'full', 'pwd');
-	// 303：POST の結果として、別の URL を GET で開き直させる（再読み込みでフォームが再送されない）
-	return c.redirect('/account', 303);
+	// 303：POST の結果として、別の URL を GET で開き直させる（再読み込みでフォームが再送されない）。
+	// /authorize から寄り道してきたなら、そこへ戻る（段4）
+	return c.redirect(takeReturnTo(c), 303);
 });
 
 // ---- 2要素目：TOTP の6桁（段2の図「ログイン」の後半） ----
@@ -132,7 +133,7 @@ login.post('/login/totp', async (c) => {
 	// 仮のセッションを捨て、新しい ID で本物のセッションを作る（権限が上がる瞬間に ID を作り直す）
 	// mfa：複数の要素を使った（RFC 8176）。パスキーのログインと並べて「多要素か」を1つの値で見られるように
 	await startSession(c, user.id, 'full', 'pwd otp mfa');
-	return c.redirect('/account', 303);
+	return c.redirect(takeReturnTo(c), 303);
 });
 
 login.get('/account', async (c) => {

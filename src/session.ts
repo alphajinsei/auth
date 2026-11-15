@@ -42,7 +42,7 @@ async function sessionUser(c: Context, stage: Stage) {
 	const id = getCookie(c, COOKIE);
 	if (!id) return null;
 	const [row] = await db
-		.select({ id: users.id, username: users.username, amr: sessions.amr })
+		.select({ id: users.id, username: users.username, amr: sessions.amr, authTime: sessions.createdAt })
 		.from(sessions)
 		.innerJoin(users, eq(sessions.userId, users.id))
 		.where(and(eq(sessions.idHash, sha256(id)), eq(sessions.stage, stage), gt(sessions.expiresAt, new Date())));
@@ -61,4 +61,20 @@ export async function endSession(c: Context) {
 	const id = getCookie(c, COOKIE);
 	if (id) await db.delete(sessions).where(eq(sessions.idHash, sha256(id)));
 	deleteCookie(c, COOKIE, { path: '/', secure: true });
+}
+
+// ---- ログインのあとの戻り先（段4）。/authorize がログイン画面に寄り道させるとき、戻る先を覚えておく ----
+// ログインの方法（パスワード、TOTP、パスキー）によって通る画面が違うので、フォームで持ち回らず、短命の Cookie に入れる
+const RETURN_TO = '__Host-return-to';
+
+export function rememberReturnTo(c: Context, path: string) {
+	setCookie(c, RETURN_TO, path, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 10 * 60 });
+}
+
+// 本物のセッションを作った直後に呼ぶ。覚えた戻り先を返し、Cookie を消す。なければ /account。
+// /authorize にしか戻さない：任意の URL に戻すと、ログイン画面が「どこへでも飛ばせる踏み台」（オープンリダイレクト）になる
+export function takeReturnTo(c: Context): string {
+	const path = getCookie(c, RETURN_TO);
+	deleteCookie(c, RETURN_TO, { path: '/', secure: true });
+	return path?.startsWith('/authorize?') ? path : '/account';
 }

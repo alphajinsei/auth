@@ -36,6 +36,13 @@
       "when": 1794700594786,
       "tag": "0004_password_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1794707786799,
+      "tag": "0005_oidc",
+      "breakpoints": true
     }
   ]
 }

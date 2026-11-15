@@ -38,7 +38,7 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | `src/password.ts` | パスワードのハッシュと照合（Argon2id） |
 | `src/origin.ts` | CSRF の対策（`Origin` ヘッダーの確認） |
 | `src/views.ts` | 画面の HTML |
-| `src/admin.ts` | 管理用のコマンド：`create-user <名前>`（パスワードは画面に出さずに読む）、`unlock <名前>`、`set-password <名前>`（パスキーだけの利用者が端末をなくしたときの回復） |
+| `src/admin.ts` | 管理用のコマンド：`create-user <名前>`（パスワードは画面に出さずに読む）、`unlock <名前>`、`set-password <名前>`（パスキーだけの利用者が端末をなくしたときの回復）、`create-client <client_id> <redirect_uri> [名前]`（OIDC の RP を登録。client_secret は一度だけ表示） |
 | `src/db/schema.ts` | テーブル定義の唯一の正（Drizzle、MySQL） |
 | `src/db/client.ts` | DB の接続（環境変数 `DB_HOST` など）。日時は UTC で読み書きする（`timezone: 'Z'`） |
 | `src/mail.ts` | メールの送信（nodemailer）。送り先は環境変数 `SMTP_HOST` など、差出人は `MAIL_FROM`（共通基盤の `noreply@`）に表示名を付ける |

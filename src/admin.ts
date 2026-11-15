@@ -1,10 +1,10 @@
 // 管理用のコマンド。登録の画面の代わりに、サーバーの上で叩く
 //   手元：npx tsx --env-file=local.env src/admin.ts create-user alice
 //   本番：docker compose exec app node dist/admin.js create-user alice
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { db, pool } from './db/client.js';
-import { users } from './db/schema.js';
+import { oauthClients, users } from './db/schema.js';
 import { hashPassword } from './password.js';
 
 // パスワードを、画面に出さずに読む。端末でなければ（パイプで渡されたら）1行読む
@@ -75,13 +75,31 @@ async function setPassword(username: string) {
 	console.log(`set password for "${username}"`);
 }
 
+// RP（client）を登録する（段4）。client_secret はここで一度だけ表示する。DB には SHA-256 だけを置くので、なくしたら登録し直す
+//   例：admin create-client demo-app http://localhost:4000/callback "デモのアプリ"
+async function createClient(id: string, redirectUri: string, name: string) {
+	const url = new URL(redirectUri); // 形が URL でなければ、ここで止まる
+	if (url.hash) throw new Error('redirect_uri must not contain a fragment');
+	if (url.protocol !== 'https:' && url.hostname !== 'localhost') throw new Error('redirect_uri must be https (or http://localhost)');
+	const [existing] = await db.select().from(oauthClients).where(eq(oauthClients.id, id));
+	if (existing) throw new Error(`client "${id}" already exists`);
+
+	const secret = randomBytes(32).toString('base64url');
+	const secretHash = createHash('sha256').update(secret).digest('hex');
+	await db.insert(oauthClients).values({ id, secretHash, name, redirectUris: JSON.stringify([redirectUri]) });
+	console.log(`created client "${id}"`);
+	console.log(`  redirect_uri:  ${redirectUri}`);
+	console.log(`  client_secret: ${secret}   <- shown only once`);
+}
+
 const [command, ...args] = process.argv.slice(2);
 try {
 	if (command === 'create-user' && args[0]) await createUser(args[0]);
 	else if (command === 'unlock' && args[0]) await unlockUser(args[0]);
 	else if (command === 'set-password' && args[0]) await setPassword(args[0]);
+	else if (command === 'create-client' && args[1]) await createClient(args[0], args[1], args[2] ?? args[0]);
 	else {
-		console.error('usage: admin create-user <username> | admin unlock <username> | admin set-password <username>');
+		console.error('usage: admin create-user <username> | unlock <username> | set-password <username> | create-client <client_id> <redirect_uri> [name]');
 		process.exitCode = 1;
 	}
 } catch (e) {

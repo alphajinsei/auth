@@ -20,6 +20,9 @@ app.use(checkOrigin(origin));
 app.use(async (c, next) => {
 	await next();
 	c.header('Cache-Control', 'no-store');
+	// ほかのサイトの iframe に埋め込ませない。同意画面を透明な iframe で重ね、「許可する」を押させる攻撃（クリックジャッキング）の対策
+	c.header('X-Frame-Options', 'DENY');
+	c.header('Content-Security-Policy', "frame-ancestors 'none'");
 });
 
 // LB のヘルスチェック。DB を見ない（DB が落ちたときに、LB がアプリまで切り離さないように）

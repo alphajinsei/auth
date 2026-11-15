@@ -134,3 +134,41 @@ export const totpSetupPage = (qrDataUrl: string, secretBase32: string, error?: s
       <button>確認して有効にする</button>
     </form>`,
 	);
+
+// ---- OIDC（段4） ----
+
+// scope を、利用者に見せる言葉にする
+const scopeLabel: Record<string, string> = {
+	openid: 'あなたの ID（このアプリの中であなたを見分けるための番号）',
+	profile: 'ユーザー名',
+};
+
+// 同意画面（図「ログイン」の 5）。要求の中身は隠し項目で POST /authorize に持ち回る
+export const consentPage = (
+	username: string,
+	req: { clientId: string; clientName: string; redirectUri: string; scope: string; state: string; nonce: string | null; codeChallenge: string },
+) =>
+	layout(
+		'アクセスの許可',
+		html`
+    <p><strong>${req.clientName}</strong>（<code>${req.clientId}</code>）が、<strong>${username}</strong> さんの次の情報を求めています。</p>
+    <ul>${req.scope.split(' ').map((s) => html`<li>${scopeLabel[s] ?? s}</li>`)}</ul>
+    <p><small>許可すると、<code>${new URL(req.redirectUri).origin}</code> に戻ります。</small></p>
+    <form method="post" action="/authorize">
+      <input type="hidden" name="response_type" value="code">
+      <input type="hidden" name="client_id" value="${req.clientId}">
+      <input type="hidden" name="redirect_uri" value="${req.redirectUri}">
+      <input type="hidden" name="scope" value="${req.scope}">
+      <input type="hidden" name="state" value="${req.state}">
+      <input type="hidden" name="nonce" value="${req.nonce ?? ''}">
+      <input type="hidden" name="code_challenge" value="${req.codeChallenge}">
+      <input type="hidden" name="code_challenge_method" value="S256">
+      <button name="decision" value="allow">許可する</button>
+      <p></p>
+      <button name="decision" value="deny" class="secondary">許可しない</button>
+    </form>`,
+	);
+
+// /authorize で、redirect_uri へ戻せないエラー（client が不明、redirect_uri が登録と違う）
+export const authorizeErrorPage = (message: string) =>
+	layout('ログインできません', html`<p class="error">${message}</p><p>ログインを求めたアプリの設定に誤りがあります。</p>`);
