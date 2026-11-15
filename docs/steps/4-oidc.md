@@ -153,6 +153,21 @@ sequenceDiagram
   R-->>B: Set-Cookie（demo-app のセッション）、トップへ。「ようこそ、〇〇さん」
 ```
 
+#### 図「ログイン」とコードの対応
+
+| 手順 | 図の中身 | コード |
+| --- | --- | --- |
+| ログイン 1〜3 | demo-app が乱数を作り、/authorize へ送る | demo-app（4-d） |
+| ログイン 4 | GET /authorize | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `GET /authorize` |
+| ログイン 4 のあとの 1つ目の Note | client_id と redirect_uri を照らす | 同じファイルの `checkRequest`（要素②）。外れたら auth の画面にエラー（`authorizeErrorPage`）。そのあとの検査（response_type、openid、PKCE、state）の失敗は redirect_uri へ `error=` で返す |
+| ログイン 4 のあとの 2つ目の Note | ログインしていなければログイン画面へ | `currentUser` が空なら、[src/session.ts](../../src/session.ts) の `rememberReturnTo` で戻り先を Cookie に覚えて `/login` へ。ログインが済んだら `takeReturnTo` で戻る（パスワード、TOTP、パスキーのどれでも） |
+| ログイン 5 | 同意画面 | `hasConsent` が偽なら、[src/views.ts](../../src/views.ts) の `consentPage`。真なら同意画面を飛ばして、ログイン 7 のあとの Note へ（図「2つ目以降のログイン」） |
+| ログイン 6〜7 | 「許可する」→ POST /authorize | `POST /authorize`。隠し項目をもう一度 `checkRequest` で照らす。「許可しない」なら `error=access_denied` |
+| ログイン 7 のあとの Note | 認可コードを作る | `issueCode`（要素④） |
+| ログイン 8 | 認可コードを保存、同意を記録 | `db.insert(authorizationCodes)`、`db.insert(oauthConsents)` |
+| ログイン 9 | 302 → /callback（code、state） | `issueCode` の最後の `c.redirect` |
+| ログイン 10〜14 | /callback、/token、検証 | 4-c（auth）、4-d（demo-app） |
+
 - **redirect_uri の完全一致**（ログイン 4 のあとの 1つ目の Note）。前方一致や、ワイルドカードを許すと、`https://demo.example.com/callback/../evil` のような抜け道で、コードを別の場所に送らせられる。登録した文字列と、1文字残らず同じであることを求める。
 - **redirect_uri を `/token` でもう一度送る**のは、コードを出したときの redirect_uri と同じかを auth が確かめるため（コードを別の client の流れに持ち込ませない）。
 - **同意は記録する**。同じ利用者・同じ client・同じ scope なら、次からは同意画面を出さない（「2つ目以降のログイン」）。
