@@ -1240,3 +1240,63 @@ ID トークンはログインの瞬間の写真のようなもので、あと�
 | 4-e | 本番に載せ、手元の demo-app から本番の auth でログインする（demo-app は localhost のまま） |
 
 ロードマップとの対応：4-a が「署名鍵、JWKS、Discovery」、4-b と 4-c が「`/authorize`、同意画面、`/token`、`/userinfo`」、4-d と 4-e が「demo-app を RP にして『auth でログイン』」。
+
+### Q. 「署名の鍵を作る（共通基盤の Vault を変える）」は、auth が署名に使う鍵を Terraform で作り、その鍵を Vault に登録する、という立ち位置か。Vault は各アプリ（auth も認証の機能を持つ1つのアプリとして）で作ってよい、という整理だった記憶だが合っているか
+
+前半はそのとおり。後半は少し違い、**Vault（金庫そのもの）は共通基盤に1つだけで、各アプリが作ってよいのは、その中に入れるシークレット（金庫の中の1件1件）**。
+
+| もの | 誰が作るか | どこに書くか |
+| --- | --- | --- |
+| Vault（金庫）と、暗号化の鍵（マスターキー） | 共通基盤 | `oci-platform/terraform/vault.tf` |
+| VM が Vault を読める権限（動的グループとポリシー） | 共通基盤 | 同じ `vault.tf` |
+| シークレット（DB のパスワード、TOTP の鍵、ID トークンの署名の鍵など） | 各アプリ | `<アプリ>/infra/terraform/main.tf`（共通基盤の出力 `vault_id`、`vault_key_id` を使う） |
+
+oci-platform の README の役割分担の表にも、「Terraform（アプリ）：そのアプリの LB のリスナー・バックエンド・セット、Vault のシークレット、DNS レコード」とある。
+
+ID トークンの署名の鍵の流れ（DB のパスワード、TOTP の鍵と同じ経路）：
+
+1. auth の Terraform が `tls_private_key`（ECDSA P-256）で鍵を作る。値は Terraform の state（OCI の Object Storage）に残る
+2. 同じ Terraform が、それを共通基盤の Vault に `auth-oidc-signing-key` というシークレットとして入れる
+3. `npm run deploy` のとき、app VM の上で `platform-secret auth-oidc-signing-key` が Vault から取り出し、`.env` の `OIDC_SIGNING_KEY` に書く（VM 自身の権限で読むので、取り出すための鍵は要らない）
+4. コンテナが環境変数として読み、`src/jwt.ts` が署名に使う
+
+見出しの「共通基盤の Vault を変える」は、金庫に1件足すという意味。金庫そのものは変えない。
+
+### Q. demo-app をコンテナ化しない（手元で動かす）のは、何か意図があったのか。コンテナを浮かべてもよいと思った。demo-app だけ手元で動くと、処理が余計わかりづらくならないか
+
+意図はあった。段4の文書で「段5で独立したリポジトリにするまでの仮住まい」と決めていて、共通基盤に載せるのは段5の項目（「demo-app を独立したリポジトリにし、共通基盤に載せる（今後のサービスのひな形）」）にしている。理由は2つ。
+
+1. **共通基盤に載せると、OIDC と関係のない作業が増える。**LB のリスナー、DNS のレコード、ポートの台帳、client_secret を Vault に置く、デプロイのスクリプト。どれも段5でひな形を作るときに1回やれば済み、段4のうちにやると、段5で独立させるときにもう一度やり直すことになる。
+2. **RP がどこにあっても、流れは同じだと見られる。**表の通信（リダイレクト）はブラウザが運ぶので、demo-app が手元でも本番の auth と話せる。裏の通信（`/token`、`/userinfo`）は、手元の demo-app から本番の auth へ、インターネット越しに届く。これは、別の場所で動く本物のサービスが auth を使うときと同じ形。
+
+「分かりづらくならないか」について：流れ（図「ログイン」の 1〜14）は、demo-app が手元でも本番でも1つも変わらない。変わるのは demo-app の URL（`http://localhost:4000` か `https://demo.alphajinsei.com` か）と、それに合わせた redirect_uri の登録だけ。一方で、手元だと demo-app のログ（標準出力）をそのまま見られるので、`/callback` で何が起きたかは追いやすい。
+
+### Q. 本番で実行した `ssh oci-app 'cd /opt/apps/auth && docker compose exec -T app node dist/admin.js create-client demo-app http://localhost:4000/callback "デモのアプリ"'` は、何をやっていたのか
+
+本番の auth に「demo-app という RP がいて、戻り先はこの URL」と登録していた。先の問い（「demo-app を作るとき、auth に事前の登録（申請）が必要か」）の、その登録に当たる。Google なら、Google Cloud Console で OAuth クライアントを作る操作。
+
+| 部分 | 意味 |
+| --- | --- |
+| `ssh oci-app '…'` | app VM の上で実行する |
+| `cd /opt/apps/auth` | auth の `compose.yaml` がある場所へ |
+| `docker compose exec -T app` | 動いている auth のコンテナの中で実行する。`-T` は端末をつながない（ssh にコマンドを渡す形では端末がないため） |
+| `node dist/admin.js create-client` | 管理用のコマンド（`src/admin.ts` をビルドしたもの）の、client の登録 |
+| `demo-app` | client_id |
+| `http://localhost:4000/callback` | 登録する redirect_uri。`/authorize` と `/token` で、これと完全一致するかを照らす |
+| `"デモのアプリ"` | 同意の画面に出す名前 |
+
+中でしていること：
+
+1. 32バイトの乱数で client_secret を作る
+2. 本番の DB の `oauth_clients` に、client_id、secret の SHA-256、名前、redirect_uri を入れる
+3. secret そのものは画面に1回だけ出す。DB にはハッシュしかないので、二度と表示できない
+
+コンテナの中で実行するのは、本番の DB（HeatWave）が private subnet にあって VM からしかつながらず、DB の接続情報（Vault から取り出したパスワード）もコンテナの環境変数にしかないため。手元の DB と本番の DB は別なので、client の登録もそれぞれ要る（secret も別の値になる）。
+
+redirect_uri が `http://localhost` なので、本番の auth（https）から、手元の PC で動く demo-app に戻せる。`admin create-client` は、https 以外では localhost だけを許している。
+
+**理解の確認**：「新しく自分のアプリから auth に OIDC でログインする線を足すときに、事前に auth へ『自分のアプリから OIDC で接続できるようにしてほしい。client_id はこれ、redirect_uri（callback してほしいリダイレクト先）はこれ』と伝えるもの」という理解で合っている。auth の側から見ると、伝えられた内容を記録し、引き換えに client_secret（合言葉）を1回だけ渡す手続き。以後、`/authorize` ではその client_id と redirect_uri の組で照らし、`/token` では合言葉で相手を確かめる。
+
+### （つまずき）本番の auth でログインしたつもりが、ID トークンの iss が `http://localhost:3001` だった
+
+`npm run demo` が `EADDRINUSE: address already in use :::4000` で起動できていなかった。前に Claude が手元の通しの確認で起動した demo-app（手元の auth に向けたもの）が、4000番で動いたまま残っていて、ブラウザはそちらと、手元の auth（3001番）を通っていた。`iss` を見れば、どの OP が出した ID トークンかが分かる（RP が iss を確かめる理由そのもの）。古いほうを止めて、起動し直した。
