@@ -174,6 +174,14 @@ sequenceDiagram
   Note over R: 覚えておく。ID トークンのヘッダーの kid が知らない値なら、取り直す（鍵の入れ替えに追従する）
 ```
 
+#### 図「準備」とコードの対応
+
+| 手順 | 図の中身 | コード |
+| --- | --- | --- |
+| 準備 1 → 2 | Discovery | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `GET /.well-known/openid-configuration` |
+| 準備 3 → 4 | JWKS | 同じファイルの `GET /jwks.json` → [src/jwt.ts](../../src/jwt.ts) の `jwks`（秘密鍵から公開鍵を作り、`kid` は公開鍵の指紋＝JWK Thumbprint） |
+| 準備 4 のあとの Note | 覚えておく | demo-app（4-d） |
+
 - demo-app に渡す設定は、auth の URL（issuer）と、client_id、client_secret の3つだけ。各 URL は Discovery から読む。
 - 公開鍵は秘密ではないので、誰でも取れる。署名に使う秘密鍵は auth だけが持つ（Vault に置く。5 の「決めること」）。
 

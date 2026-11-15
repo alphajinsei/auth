@@ -116,3 +116,25 @@ resource "oci_vault_secret" "totp_key" {
     content      = base64encode(random_bytes.totp_key.base64) # 中身は「鍵の base64 の文字列」。platform-secret はそれを返す
   }
 }
+
+# ID トークン（段4）に署名する鍵。ES256（P-256）。
+# 秘密鍵は Terraform の state（OCI の Object Storage）と Vault にだけ置く。-replace で作り直すと、
+# それまでに出した ID トークンは検証できなくなる（JWKS に新旧を並べる入れ替えは、まだ作っていない）
+resource "tls_private_key" "oidc_signing" {
+  algorithm   = "ECDSA"
+  ecdsa_curve = "P256"
+}
+
+resource "oci_vault_secret" "oidc_signing_key" {
+  compartment_id = local.platform.compartment_id
+  vault_id       = local.platform.vault_id
+  key_id         = local.platform.vault_key_id
+  secret_name    = "${local.name}-oidc-signing-key"
+  description    = "ES256 private key (PKCS#8 PEM, base64) that signs OIDC ID tokens"
+
+  secret_content {
+    content_type = "BASE64"
+    # 中身は「PEM の base64」（.env に1行で書けるように）。platform-secret はそれを返す
+    content = base64encode(base64encode(tls_private_key.oidc_signing.private_key_pem_pkcs8))
+  }
+}

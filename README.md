@@ -51,7 +51,7 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | `local.env` | `npm run dev` の接続情報（手元の MySQL。秘密情報ではない） |
 | `scripts/deploy.sh` | `npm run deploy`。ソースを app VM に送り、そこでビルドして入れ替える（`remote-deploy.sh` を VM で流す） |
 | `scripts/db-init.sh` | `npm run db:init`。初回だけ、ops からスキーマと専用のユーザーを作る（`remote-db-init.sh` を ops で流す） |
-| `infra/terraform/` | このアプリが共通基盤に足すもの：LB のホスト名・リスナー・バックエンド・セット（`main.tf`）、DB のパスワード（Vault）、DNS レコード（`cloudflare.tf`）。名前・ポート・DB 名は `main.tf` の `locals` だけに書き、スクリプトは Terraform の出力から読む |
+| `infra/terraform/` | このアプリが共通基盤に足すもの：LB のホスト名・リスナー・バックエンド・セット（`main.tf`）、DB のパスワード・TOTP の鍵・ID トークンの署名の鍵（Vault）、DNS レコード（`cloudflare.tf`）。名前・ポート・DB 名は `main.tf` の `locals` だけに書き、スクリプトは Terraform の出力から読む |
 
 ## 3. 手元での開発
 
@@ -105,7 +105,7 @@ npm run deploy
 ```
 
 1. ソースを `oci-app:/opt/apps/auth/` に rsync で送る（`node_modules`、`infra/`、手元用のファイルは送らない）
-2. app VM の上で：`.env` を書く（DB のパスワードは `platform-secret` で Vault から。メールの送り先は共通基盤の出力 `smtp`） → 今のイメージを `:previous` として残す → `docker compose build`（arm64 でそのままビルド） → マイグレーション → `docker compose up -d` → `/health` が返るまで待つ
+2. app VM の上で：`.env` を書く（DB のパスワード、TOTP の鍵、ID トークンの署名の鍵は `platform-secret` で Vault から。メールの送り先は共通基盤の出力 `smtp`） → 今のイメージを `:previous` として残す → `docker compose build`（arm64 でそのままビルド） → マイグレーション → `docker compose up -d` → `/health` が返るまで待つ
 
 マイグレーションが失敗したら、コンテナは入れ替わらない。戻すときは、app VM で `docker tag auth:previous auth:latest && docker compose up -d`（マイグレーションは戻らない）。
 
@@ -123,6 +123,7 @@ npm run deploy
 - **MySQL には `RETURNING` がない。**挿入した行は `$returningId()` で ID を受け取ってから読み直す。
 - **スキーマは `schema.ts` からだけ変える。**本番に直接 DDL を流すと、Drizzle のスナップショットと実物がずれる。
 - **DB のパスワードは Vault にだけある。**手元にもリポジトリにも置かない。app VM の `.env`（権限 600）と、コンテナの設定には残る。作り直すときは `./tf.sh apply -replace=random_password.db` → `npm run db:init` → `npm run deploy`。
+- **TOTP の鍵と、ID トークンの署名の鍵も Vault にある（Terraform の state にも残る）。**TOTP の鍵を作り直すと、登録済みの TOTP が全部読めなくなる。署名の鍵を作り直すと、それまでに出した ID トークンが検証できなくなる。どちらも `-replace` しない。
 - **LB の変更は1つずつ。**OCI の LB は同時に1つの変更しか受け付けない。共通基盤や別のアプリの apply と同時に流さない。
 - **DNS レコードは Terraform の管理。**ダッシュボードで直さない（コメントに `managed by Terraform` と出る）。
 - **メールの差出人は `noreply@alphajinsei.com` だけ。**ほかのアドレスを `From:` にすると Email Delivery が断る。表示名でアプリを区別する。返信は届かない。

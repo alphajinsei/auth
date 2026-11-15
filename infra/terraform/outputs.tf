@@ -37,3 +37,7 @@ output "smtp" {
 output "totp_key_secret" {
   value = oci_vault_secret.totp_key.secret_name
 }
+
+output "oidc_signing_key_secret" {
+  value = oci_vault_secret.oidc_signing_key.secret_name
+}

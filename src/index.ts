@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { db, pool } from './db/client.js';
 import { checkOrigin } from './origin.js';
 import { login } from './routes/login.js';
+import { oidc } from './routes/oidc.js';
 import { passkey } from './routes/passkey.js';
 import { totp } from './routes/totp.js';
 
@@ -33,6 +34,7 @@ app.get('/', (c) => c.redirect('/account', 303));
 app.route('/', login);
 app.route('/', totp);
 app.route('/', passkey);
+app.route('/', oidc);
 
 app.use('/*', serveStatic({ root: './public' }));
 
