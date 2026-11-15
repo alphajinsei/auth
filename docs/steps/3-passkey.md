@@ -1,8 +1,21 @@
 # 段3：パスキー
 
-最終更新：2026-11-12
+最終更新：2026-11-15
 
 背景は [番外編：FIDO2 とパスキーの来歴](../notes/extra-history-fido.md)。ログインしたあと、アカウントの画面からパスキーを登録し、ログイン画面の「パスキーでログイン」で、パスワードなしでログインできるようにする。
+
+## この文書の読み方
+
+| 節 | 中身 |
+| --- | --- |
+| 1. 技術の要素 | パスキーを7つの要素に分ける。以下の節は、この番号で読む |
+| 2. 登場人物 | 用語の表 |
+| 3. 仕組みの補足 | 用語の表だけでは分かりにくいところ（RP の層、origin、ブラウザを信じる範囲） |
+| 4. 流れ | 誰が何を作るかの文章と、登録・ログインのシーケンス図。各図の下に「図とコードの対応」 |
+| 5. パスキーだけのアカウント、削除、amr | 3-c の決めごと |
+| 6. 実装 | ライブラリとの分担、ファイル、テーブル、小分け |
+
+**番号が2種類あるので注意。**1 の表の ①〜⑦ は**要素**の番号。4 の図の丸数字は、Mermaid が矢印に振る**手順**の番号で、別物。コードのコメントでは、要素を「要素③」、手順を「登録 7」「ログイン 7」（どの図の何番の矢印か）と書き分ける。Note には番号がないので、「登録 7 のあとの 2つ目の Note」のように、直前の矢印で指す。
 
 ## 1. 技術の要素：7つの組み合わせ
 
@@ -21,9 +34,7 @@ FIDO のシーケンスは、次の7つの要素の組み合わせで説明で�
 - **登録** ＝ ⑥ ログイン済みの画面から始める → ② challenge を渡す → ⑤ 本人を確かめて、④ この RP ID 用の鍵ペアを作る → ③ origin 入りの応答を返す → auth は ②③④ を確かめ、① の公開鍵を保存する
 - **ログイン** ＝ ② challenge を渡す → ④ この RP ID の鍵を選び、⑤ 本人を確かめて、① 署名する（原文には ② と ③ が入っている）→ auth は ②③④ を確かめ、① を公開鍵で検証し、⑦ カウンタを見る
 
-下の図の Note の「〜を確かめる」は、どれもこの番号のどれかに当たる。
-
-**番号が2種類あるので注意**。この表の ①〜⑦ は**要素**の番号。下の図の丸数字は、Mermaid が矢印に振る**手順**の番号で、別物。コードのコメントでは、要素を「要素③」、手順を「登録 7」「ログイン 7」（どの図の何番の矢印か）と書き分ける。Note には番号がないので、「登録 7 のあとの 2つ目の Note」のように、直前の矢印で指す。
+4 の図の Note の「〜を確かめる」は、どれもこの番号のどれかに当たる。
 
 ## 2. 登場人物
 
@@ -37,12 +48,18 @@ FIDO のシーケンスは、次の7つの要素の組み合わせで説明で�
 | 認証器（authenticator） | 秘密鍵を持ち、署名する。指紋や PIN で本人を確かめる | スマホ、Mac の Touch ID、Windows Hello、セキュリティキー |
 | challenge | サーバーが毎回作る乱数。署名に含めさせて、使い回しを防ぐ | 32バイト |
 
-**RP は層によって違うものを指す。**auth は WebAuthn の層では RP で、OIDC の層（段4）では OP（IdP）。
+## 3. 仕組みの補足
+
+### RP は層によって違うものを指す
+
+auth は WebAuthn の層では RP で、OIDC の層（段4）では OP（IdP）。
 
 | 層 | 証明を出す側 | 証明 | RP（それを信じる側） |
 | --- | --- | --- | --- |
 | WebAuthn（段3） | 認証器 | 署名（assertion） | auth |
 | OIDC（段4） | auth（OP） | ID トークン | demo-app |
+
+WebAuthn の仕様も、用語の節で「ある文脈で RP である者が、ほかの文脈（X.509、OAuth など）でも RP とは限らない」と注記している。
 
 ### 「WebAuthn を呼び出す」と origin
 
@@ -69,17 +86,19 @@ FIDO のシーケンスは、次の7つの要素の組み合わせで説明で�
 5. リダイレクトで app.example.com に戻る（OIDC の層。段4）
 ```
 
-### ブラウザを信じる範囲と、RP の分け方
+### ブラウザを信じる範囲
 
 ブラウザと認証器の間（CTAP、または OS の内部）は、サーバーからは見えない。サーバーがやりとりするのは、ブラウザの JavaScript だけ。
 
 **ブラウザは信じる前提**。origin を正しく書くこと、RP ID がページのドメインと合うか確かめることは、ブラウザ（と OS）に任せている。攻撃者が自分で細工したブラウザを作っても、被害者の秘密鍵がないので署名できない。破れるのは被害者のブラウザ自体が乗っ取られたときだけで、それはパスワードでも Cookie でも守れない範囲として、FIDO の対象外にしている。サーバーは、署名・challenge・origin・RP ID のハッシュをすべて自分で確かめる。
 
+### RP サーバーと RP アプリケーションを分けるか
+
 RP サーバーと RP アプリケーションを別のサービスに分ける構成（検証専用の「FIDO サーバー」を置き、各アプリが API で呼ぶ）は企業でよく見かけるが、プロトコル上で必須なのは「challenge の発行と検証がサーバー側にあること」だけ。このリポジトリでは、段4で「パスキーを扱うのは IdP（auth）だけ。各アプリは OIDC で結果だけを受け取る」という分離を入れる。
 
-## 3. 流れ
+## 4. 流れ
 
-### 誰が何を作り、何を渡すか（文章で）
+### 全体：誰が何を作り、何を渡すか
 
 auth が送るのは options だけ。その中身は、ブラウザと認証器を通って、形を変えて戻ってくる。ログインの場合：
 
@@ -225,7 +244,7 @@ sequenceDiagram
 | ログイン 8 のあとの 2つ目の Note | RP ID のハッシュとフラグ | `verifyAuthentication` → `checkAuthData`（要素④⑤）。続けて user handle が鍵の持ち主か |
 | ログイン 8 のあとの 3つ目の Note | 公開鍵で署名を検証する | `verifyAuthentication` の `coseToKey` と `crypto.verify`（要素①） |
 | ログイン 8 のあとの 4つ目の Note | カウンタが増えているか | `verifyAuthentication` の最後（要素⑦） |
-| ログイン 9 | カウンタを更新、セッションを記録 | `src/routes/passkey.ts` の `db.update(webauthnCredentials)` と `startSession(..., 'full', 'hwk' か 'swk')` |
+| ログイン 9 | カウンタを更新、セッションを記録 | `src/routes/passkey.ts` の `db.update(webauthnCredentials)` と `startSession(..., 'full', 'hwk mfa' か 'swk mfa')` |
 | ログイン 10 | Set-Cookie、/account へ | `startSession` が Cookie を付け、`public/passkey-login.js` が `/account` へ移る |
 
 **challenge と鍵の ID は、別々の役目で照らす。**サーバーは2つのものを引く。
@@ -236,44 +255,9 @@ sequenceDiagram
 そのうえで、届いた authenticatorData と clientDataJSON から署名の原文を組み立て、その公開鍵で検証する（3つ目の Note）。clientDataJSON の中の challenge は、1つ目の Note で、引いた challenge と比べてある。原文に challenge が入っているので、署名が正しければ「この鍵の持ち主が、今回の challenge に応えた」と言える。
 
 - パスワードの失敗による一時停止（段1-c）は、パスキーのログインでは見ない。あれはパスワードの総当たりを遅くするためのもので、パスキーは総当たりできない。
-- `amr` は、同期される鍵（authenticatorData の BE フラグが立つ）なら `swk`、端末に固定の鍵なら `hwk`（RFC 8176）。ユーザー検証（指紋・PIN）の分をどう表すかは 3-c で決める。
+- `amr` は `hwk mfa` か `swk mfa`（5 の「amr の値」）。
 
-## 4. 自分で書くところ、ライブラリに任せるところ
-
-| 処理 | 自分で書く | ライブラリ（`@simplewebauthn/server` の分解用の関数） |
-| --- | --- | --- |
-| challenge | 乱数で作る、覚える、一度使ったら消す | — |
-| options | 組み立てる（RP ID、利用者、方式、ユーザー検証） | — |
-| clientDataJSON | base64url を JSON に戻し、種類・challenge・origin を確かめる | — |
-| attestationObject | — | CBOR を分解する（`decodeAttestationObject`） |
-| authenticatorData | RP ID のハッシュ、フラグ、カウンタを確かめる | バイト列を分解する（`parseAuthenticatorData`） |
-| 公開鍵 | COSE の形から、Node.js の鍵（JWK）に直す | COSE を分解する（`decodeCredentialPublicKey`） |
-| 署名の検証 | `authenticatorData ‖ SHA-256(clientDataJSON)` を、公開鍵で `crypto.verify` する | — |
-
-ブラウザ側は、`PublicKeyCredential.parseCreationOptionsFromJSON()` と `credential.toJSON()` を使う（主要なブラウザが対応済み）。サーバーとやりとりする JSON とバイト列の変換を、ブラウザが引き受けてくれる。
-
-## 5. テーブル
-
-| テーブル | 中身 |
-| --- | --- |
-| `webauthn_credentials`（新しく作る） | `id`（鍵の ID。認証器が作る）、`user_id`、`public_key`（COSE の形のまま）、`sign_count`、`name`（「iPhone」などの表示用）、`created_at`、`last_used_at` |
-| `webauthn_challenges`（新しく作る） | `id_hash`（Cookie に入れる乱数の SHA-256）、`challenge`、`purpose`（register / login）、`user_id`（登録のときだけ）、`expires_at` |
-| `users`（変える） | `password_hash` を空にできるようにする（パスキーだけのアカウントのため。3-c） |
-
-- 利用者の ID（user handle）には、`users.id`（UUID）を使う。認証器に保存され、ログインのときに返ってくる。名前やメールアドレスのような個人情報を入れないのが決まり。
-- 1人で複数の鍵を登録できる（スマホ、パソコン、セキュリティキー）。
-
-## 6. 実装の小分け
-
-| | 中身 |
-| --- | --- |
-| 3-a | 登録：options、ブラウザの JavaScript、検証、保存。アカウントの画面に「パスキーを登録」と一覧 |
-| 3-b | ログイン：options、ブラウザの JavaScript、署名の検証、セッション。ログイン画面に「パスキーでログイン」 |
-| 3-c | パスキーだけのアカウント（パスワードを空にできる）、パスキーの削除、`amr` の値、本番で試す |
-
-手元では `http://localhost:3001` で試す。WebAuthn は HTTPS が必須だが、localhost だけは例外として HTTP でも使える。RP ID は `localhost`。
-
-## 7. パスキーだけのアカウント、削除、amr（3-c）
+## 5. パスキーだけのアカウント、削除、amr（3-c）
 
 図はない。どれも、ログイン中の利用者が、自分の行を書き換えるだけ。
 
@@ -301,3 +285,48 @@ sequenceDiagram
 | パスキー（端末に固定の鍵） | `hwk mfa` | `hwk` ＝ ハードウェアで守られた鍵を持っていることの証明 |
 
 パスキーに `mfa` を付けるのは、ユーザー検証（UV）を必須にしたので、鍵（所持）＋ 指紋か PIN（生体か知識）の2要素になっているから。指紋（`fpt`）か PIN（`pin`）かは付けない。UV のフラグは「どちらかで確かめた」としか言わず、どちらかは認証器が教えてくれない。段4では、この amr を ID トークンに入れて RP（demo-app）に渡す。RP は `mfa` があるかで、多要素のログインかを判断できる。
+
+## 6. 実装
+
+### 自分で書くところ、ライブラリに任せるところ
+
+| 処理 | 自分で書く | ライブラリ（`@simplewebauthn/server` の分解用の関数） |
+| --- | --- | --- |
+| challenge | 乱数で作る、覚える、一度使ったら消す | — |
+| options | 組み立てる（RP ID、利用者、方式、ユーザー検証） | — |
+| clientDataJSON | base64url を JSON に戻し、種類・challenge・origin を確かめる | — |
+| attestationObject | — | CBOR を分解する（`decodeAttestationObject`） |
+| authenticatorData | RP ID のハッシュ、フラグ、カウンタを確かめる | バイト列を分解する（`parseAuthenticatorData`） |
+| 公開鍵 | COSE の形から、Node.js の鍵（JWK）に直す | COSE を分解する（`decodeCredentialPublicKey`） |
+| 署名の検証 | `authenticatorData ‖ SHA-256(clientDataJSON)` を、公開鍵で `crypto.verify` する | — |
+
+ブラウザ側は、`PublicKeyCredential.parseCreationOptionsFromJSON()` と `credential.toJSON()` を使う（主要なブラウザが対応済み）。サーバーとやりとりする JSON とバイト列の変換を、ブラウザが引き受けてくれる。
+
+### ファイルの分担
+
+| ファイル | 動く場所 | 中身 |
+| --- | --- | --- |
+| [src/webauthn.ts](../../src/webauthn.ts) | サーバー | WebAuthn の仕様が決める確認（options の形、clientDataJSON、authenticatorData、署名、公開鍵）。HTTP も DB も知らないので、単体テストで直接試せる。RP サーバーのロジック |
+| [src/routes/passkey.ts](../../src/routes/passkey.ts) | サーバー | リクエストを受け、セッションを確かめ、challenge を DB に置き、webauthn.ts に確かめさせ、保存し、応答する。削除（3-c）もここ。並びは、前半が部品、後半がルート（図の順） |
+| [public/passkey-register.js](../../public/passkey-register.js)、[public/passkey-login.js](../../public/passkey-login.js) | 利用者のブラウザ | `navigator.credentials` を呼ぶ。auth が変換せずにそのまま配る。RP アプリケーション |
+
+### テーブル
+
+| テーブル | 中身 |
+| --- | --- |
+| `webauthn_credentials`（新しく作る） | `id`（鍵の ID。認証器が作る）、`user_id`、`public_key`（COSE の形のまま）、`sign_count`、`name`（「iPhone」などの表示用）、`created_at`、`last_used_at` |
+| `webauthn_challenges`（新しく作る） | `id_hash`（Cookie に入れる乱数の SHA-256）、`challenge`、`purpose`（register / login）、`user_id`（登録のときだけ）、`expires_at` |
+| `users`（変える） | `password_hash` を空にできるようにする（パスキーだけのアカウントのため。3-c） |
+
+- 利用者の ID（user handle）には、`users.id`（UUID）を使う。認証器に保存され、ログインのときに返ってくる。名前やメールアドレスのような個人情報を入れないのが決まり。
+- 1人で複数の鍵を登録できる（スマホ、パソコン、セキュリティキー）。
+
+### 実装の小分け
+
+| | 中身 |
+| --- | --- |
+| 3-a | 登録：options、ブラウザの JavaScript、検証、保存。アカウントの画面に「パスキーを登録」と一覧 |
+| 3-b | ログイン：options、ブラウザの JavaScript、署名の検証、セッション。ログイン画面に「パスキーでログイン」 |
+| 3-c | パスキーだけのアカウント（パスワードを空にできる）、パスキーの削除、`amr` の値、本番で試す |
+
+手元では `http://localhost:3001` で試す。WebAuthn は HTTPS が必須だが、localhost だけは例外として HTTP でも使える。RP ID は `localhost`。
