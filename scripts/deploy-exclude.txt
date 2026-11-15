@@ -5,3 +5,4 @@ infra/
 .env
 local.env
 compose.override.yaml
+demo-app/
