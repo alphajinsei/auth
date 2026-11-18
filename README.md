@@ -41,14 +41,14 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | `src/password.ts` | パスワードのハッシュと照合（Argon2id） |
 | `src/origin.ts` | CSRF の対策（`Origin` ヘッダーの確認） |
 | `src/views.ts` | 画面の HTML |
-| `src/admin.ts` | 管理用のコマンド：`create-user <名前>`（パスワードは画面に出さずに読む）、`unlock <名前>`、`set-password <名前>`（パスキーだけの利用者が端末をなくしたときの回復）、`create-client <client_id> <redirect_uri> [名前]`（OIDC の RP を登録。client_secret は一度だけ表示） |
+| `src/admin.ts` | 管理用のコマンド：`create-user <名前>`（パスワードは画面に出さずに読む）、`unlock <名前>`、`set-password <名前>`（パスキーだけの利用者が端末をなくしたときの回復）、`create-client <client_id> <redirect_uri> [名前]`（OIDC の RP を登録。client_secret は一度だけ表示。`--secret-stdin` を付けると、secret を標準入力から読み、表示しない。登録済みなら secret と redirect_uri を合わせ直す。共通基盤に載せる client が Vault の値を流し込む用） |
 | `src/db/schema.ts` | テーブル定義の唯一の正（Drizzle、MySQL） |
 | `src/db/client.ts` | DB の接続（環境変数 `DB_HOST` など）。日時は UTC で読み書きする（`timezone: 'Z'`） |
 | `src/mail.ts` | メールの送信（nodemailer）。送り先は環境変数 `SMTP_HOST` など、差出人は `MAIL_FROM`（共通基盤の `noreply@`）に表示名を付ける |
 | `src/send-test-mail.ts` | 試しに1通送る（`node dist/send-test-mail.js <宛先>`）。誰でも送らせられる口になるので、Web の API にはしない |
 | `src/migrate.ts` | マイグレーションを流す（デプロイのとき、コンテナの中で `node dist/migrate.js`） |
 | `migrations/` | drizzle-kit が作ったマイグレーションの SQL とスナップショット。手で書かない |
-| `demo-app/` | 「auth でログイン」を試す RP（Hono、ポート 4000、DB なし）。`src/rp.ts` が Discovery・JWKS・ID トークンの検証、`src/index.ts` が `/login`・`/callback`・トップの画面、ステップ5の `/call`（401 ならリフレッシュ）・`/replay`（盗難のまね）・`/logout`（`/revoke`）。設定は `demo-app/.env`（本番向け）と `demo-app/local.env`（手元向け）。どちらも git に入らない。ひな形は `.env.example`。本番には載せない |
+| `demo-app/` | 「auth でログイン」を試す RP（Hono、ポート 4000、DB なし）。`src/rp.ts` が Discovery・JWKS・ID トークンの検証、`src/index.ts` が `/login`・`/callback`・トップの画面、ステップ5の `/call`（401 ならリフレッシュ）・`/replay`（盗難のまね）・`/logout`（`/revoke`）。設定は `demo-app/.env`（本番向け）と `demo-app/local.env`（手元向け）。どちらも git に入らない。ひな形は `.env.example`。学習用で、本番には載せない（本番に載せるひな形は [sample-auth-client](https://github.com/alphajinsei/sample-auth-client)） |
 | `Dockerfile` | ビルドして `dist/` を作り、実行用のイメージに入れる |
 | `compose.yaml` | 本番と手元で共通。ポートは `.env` の `APP_PORT`（本番は台帳の 8002） |
 | `compose.override.yaml` | 手元だけ（自動で重なる）。HeatWave と同じ版の MySQL のコンテナと、メールの受け口の Mailpit、その接続情報 |
@@ -80,7 +80,7 @@ docker compose run --rm app node dist/migrate.js
 docker compose down                              # データは残る（消すなら down -v）
 ```
 
-demo-app（「auth でログイン」を試す RP。[demo-app/](demo-app/)、ステップ5で独立させるまでの仮住まい）：
+demo-app（「auth でログイン」を試す RP。[demo-app/](demo-app/)。学習用。今後のサービスのひな形は、これを独立させた [sample-auth-client](https://github.com/alphajinsei/sample-auth-client)）：
 
 ```bash
 npx tsx --env-file=local.env src/admin.ts create-client demo-app http://localhost:4000/callback "デモのアプリ"   # client_secret が一度だけ出る
@@ -126,7 +126,7 @@ npm run deploy
 
 ## 5. このサービスを使う
 
-アプリから使う（ステップ4で作る）：管理用のコマンドでクライアントを登録し、`https://auth.alphajinsei.com/.well-known/openid-configuration` を OIDC のライブラリに渡す。例は demo-app（ステップ4で作る）。
+アプリから使う：[sample-auth-client](https://github.com/alphajinsei/sample-auth-client) をテンプレートにして始める。client の登録は、そのリポジトリの `npm run register-client`（client_secret は Vault から `admin create-client --secret-stdin` に流し込む）。ライブラリを使うなら、`https://auth.alphajinsei.com/.well-known/openid-configuration` を OIDC のライブラリに渡す。
 
 利用者を作る（ステップ1で作る）：app VM で `docker compose exec app node dist/admin.js create-user <名前>`。登録の画面はない。
 

@@ -1,7 +1,7 @@
 // demo-app：auth でログインする、小さな RP。流れ：docs/steps/4-oidc.md の図「ログイン」の 1〜3、10〜14
 // ステップ5（docs/steps/5-tokens.md）：トークンをセッションに持ち、/userinfo を呼ぶ。期限切れならリフレッシュ（図「期限切れとリフレッシュ」）、
 // ログアウトで /revoke（図「ログアウトと取り消し」）。「盗難のまね」のボタンで、図「盗難の検知」も試せる
-// ステップ5で独立したリポジトリにするまでの仮住まい。DB は持たない（セッションはメモリに置き、再起動で消える）
+// 学習用（盗難のまねなど）。DB は持たない（セッションはメモリに置き、再起動で消える）。本番に載せるひな形は sample-auth-client
 import { randomBytes } from 'node:crypto';
 import { serve } from '@hono/node-server';
 import { Hono, type Context } from 'hono';

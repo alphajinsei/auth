@@ -77,29 +77,48 @@ async function setPassword(username: string) {
 
 // RP（client）を登録する（ステップ4）。client_secret はここで一度だけ表示する。DB には SHA-256 だけを置くので、なくしたら登録し直す
 //   例：admin create-client demo-app http://localhost:4000/callback "デモのアプリ"
-async function createClient(id: string, redirectUri: string, name: string) {
+// --secret-stdin：secret をここで作らず、標準入力から1行読む（表示もしない）。共通基盤に載せる client 用で、
+// secret は client の側の Terraform が作って Vault に置き、app VM の上で流し込む（sample-auth-client の scripts/register-client.sh）。
+// 登録済みなら、secret と redirect_uri を合わせ直す（何度流してもよい）
+async function createClient(id: string, redirectUri: string, name: string, secretFromStdin: boolean) {
 	const url = new URL(redirectUri); // 形が URL でなければ、ここで止まる
 	if (url.hash) throw new Error('redirect_uri must not contain a fragment');
 	if (url.protocol !== 'https:' && url.hostname !== 'localhost') throw new Error('redirect_uri must be https (or http://localhost)');
 	const [existing] = await db.select().from(oauthClients).where(eq(oauthClients.id, id));
-	if (existing) throw new Error(`client "${id}" already exists`);
+	if (existing && !secretFromStdin) throw new Error(`client "${id}" already exists`);
 
-	const secret = randomBytes(32).toString('base64url');
+	const secret = secretFromStdin ? await readStdinLine() : randomBytes(32).toString('base64url');
+	if (secret.length < 32) throw new Error('client_secret must be at least 32 characters');
 	const secretHash = createHash('sha256').update(secret).digest('hex');
-	await db.insert(oauthClients).values({ id, secretHash, name, redirectUris: JSON.stringify([redirectUri]) });
-	console.log(`created client "${id}"`);
+	const redirectUris = JSON.stringify([redirectUri]);
+	if (existing) {
+		await db.update(oauthClients).set({ secretHash, name, redirectUris }).where(eq(oauthClients.id, id));
+		console.log(`updated client "${id}"`);
+	} else {
+		await db.insert(oauthClients).values({ id, secretHash, name, redirectUris });
+		console.log(`created client "${id}"`);
+	}
 	console.log(`  redirect_uri:  ${redirectUri}`);
-	console.log(`  client_secret: ${secret}   <- shown only once`);
+	if (!secretFromStdin) console.log(`  client_secret: ${secret}   <- shown only once`);
 }
 
-const [command, ...args] = process.argv.slice(2);
+async function readStdinLine(): Promise<string> {
+	if (process.stdin.isTTY) throw new Error('--secret-stdin needs the secret on stdin (pipe it in)');
+	let data = '';
+	for await (const chunk of process.stdin) data += chunk;
+	return data.split('\n')[0].trim();
+}
+
+const [command, ...rest] = process.argv.slice(2);
+const secretFromStdin = rest.includes('--secret-stdin');
+const args = rest.filter((a) => a !== '--secret-stdin');
 try {
 	if (command === 'create-user' && args[0]) await createUser(args[0]);
 	else if (command === 'unlock' && args[0]) await unlockUser(args[0]);
 	else if (command === 'set-password' && args[0]) await setPassword(args[0]);
-	else if (command === 'create-client' && args[1]) await createClient(args[0], args[1], args[2] ?? args[0]);
+	else if (command === 'create-client' && args[1]) await createClient(args[0], args[1], args[2] ?? args[0], secretFromStdin);
 	else {
-		console.error('usage: admin create-user <username> | unlock <username> | set-password <username> | create-client <client_id> <redirect_uri> [name]');
+		console.error('usage: admin create-user <username> | unlock <username> | set-password <username> | create-client [--secret-stdin] <client_id> <redirect_uri> [name]');
 		process.exitCode = 1;
 	}
 } catch (e) {
