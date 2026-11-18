@@ -3,9 +3,9 @@
 // Cookie の SameSite=Lax と二重にしている（古いブラウザや、SameSite の例外に備える）
 import type { MiddlewareHandler } from 'hono';
 
-// 例外：/token（ステップ4）。ブラウザではなく demo-app のサーバーが呼ぶので Origin が付かない。
+// 例外：/token（ステップ4）と /revoke（ステップ5）。ブラウザではなく demo-app のサーバーが呼ぶので Origin が付かない。
 // Cookie を使わず、毎回 client_secret を Authorization ヘッダーで見せる（別のサイトのページからは付けられない）ので、CSRF の心配がない
-const EXEMPT = ['/token'];
+const EXEMPT = ['/token', '/revoke'];
 
 export function checkOrigin(allowed: string): MiddlewareHandler {
 	return async (c, next) => {

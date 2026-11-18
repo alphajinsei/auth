@@ -172,15 +172,16 @@ sequenceDiagram
 
 | 手順 | 図の中身 | コード（[src/routes/oidc.ts](../../src/routes/oidc.ts)） |
 | --- | --- | --- |
-| リフレッシュ 1〜2 | 期限切れで 401 | `GET /userinfo`（図「API を呼ぶ」と同じ）。`verifyAccessToken` が `expired` を投げる |
-| リフレッシュ 3 | POST /token（grant_type=refresh_token） | `POST /token` が grant_type で分かれ、`refreshGrant` へ。client の認証はログインのときと同じ `authenticateClient` |
+| リフレッシュ 1〜2 | 期限切れで 401 | demo-app の `POST /call`（[demo-app/src/index.ts](../../demo-app/src/index.ts)）が `/userinfo` を呼ぶ。auth は `verifyAccessToken` が `expired` を投げて 401 |
+| リフレッシュ 3 | POST /token（grant_type=refresh_token） | demo-app の `refresh`（同じセッションで同時に呼ばれたら、2回目は1回目の結果を待つ）。auth の `POST /token` が grant_type で分かれ、`refreshGrant` へ。client の認証はログインのときと同じ `authenticateClient` |
 | リフレッシュ 4 | 行を引く | `refresh_tokens` を SHA-256 で引く。その前に、系統の期限が切れた行を掃除する |
 | リフレッシュ 4 のあとの Note | client、使用済み、期限 | 知らない → `unknown refresh token`、別の client → `issued to another client`、使用済み → 図「盗難の検知」へ、1本の期限切れ → `expired`。どれも `invalid_grant` |
 | リフレッシュ 5 | 利用者と同意 | `users` と `oauth_consents` を引く。なければ系統ごと消して `invalid_grant` |
 | リフレッシュ 6 | 使用済みにし、新しい行を足す | `used_at` が空のときだけ書き換える（`affectedRows` が 1 でなければ、同時に来たもう1つが先に使った → 盗難と同じ扱い）。`issueRefreshToken` で同じ系統に足す。1本の期限は「今から14日」と系統の期限の早いほう |
 | リフレッシュ 6 のあとの Note | 新しいアクセストークン | `issueAccessToken`（5-a） |
 | リフレッシュ 7 | 新しい2つ | `{ access_token, token_type, expires_in, scope, refresh_token }`。ID トークンは入れない |
-| リフレッシュ 8〜9 | もう一度 /userinfo | demo-app の側（5-d） |
+| リフレッシュ 7 のあとの Note | 2つを入れ替える | demo-app の `refresh` が `session.tokens` を入れ替え、使用済みになった方を `previousRefresh` に覚える（「盗難のまね」のボタンのためだけ） |
+| リフレッシュ 8〜9 | もう一度 /userinfo | demo-app の `POST /call` が1回だけやり直し、sub がログインのときと同じかを確かめる。リフレッシュに失敗したら、demo-app のセッションを消して「ログインし直してください」 |
 
 ログインのとき（図「ログイン」の 13、[ステップ4](4-oidc.md)）も、返事に `refresh_token` が加わった。`codeGrant` が新しい系統を始める（`family_id` は乱数、系統の期限は30日後）。
 
@@ -261,6 +262,30 @@ sequenceDiagram
 - すでに出たアクセストークンは、期限（5分）まで `/userinfo` を通る。demo-app はセッションごと捨てるので、手元に残らない。
 - auth のセッション（ブラウザの Cookie）は、ステップ4と同じく残る。もう一度「auth でログイン」を押すと、auth の画面を通らずに戻ってくる。
 
+#### 図「ログアウトと取り消し」とコードの対応
+
+| 手順 | 図の中身 | コード |
+| --- | --- | --- |
+| ログアウト 1〜2 | 「ログアウト」→ POST /logout | demo-app の `POST /logout`。Discovery の `revocation_endpoint` へ、リフレッシュトークンを送る |
+| ログアウト 3 | POST /revoke（token、client の認証） | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `POST /revoke`。client の認証は `/token` と同じ `authenticateClient`。Origin の確認からは外す（[src/origin.ts](../../src/origin.ts)。`/token` と同じ理由） |
+| ログアウト 3 のあとの Note | この client のものか | 別の client のトークンなら 400 `invalid_grant`（RFC 7009 2.1）。アクセストークン（JWT。「.」を含む）なら 400 `unsupported_token_type`（取り消しても効かないので、「取り消せた」と誤解させない） |
+| ログアウト 4 | 系統を全部消す | `revokeFamily`（5-b で盗難の検知に使ったものと同じ）。監査ログに `refresh_token_revoked` |
+| ログアウト 5 | 200 | 本文なしの 200。知らないトークンでも 200 |
+| ログアウト 6 | トップへ | demo-app がセッションを消す。`/revoke` が失敗しても（auth が落ちている、など）ログアウトは続ける |
+
+手元で試した結果：
+
+| 試したこと | 結果 |
+| --- | --- |
+| RT2 を取り消す | 200。系統の行（使用済みの RT1 と RT2）が0になった |
+| 取り消した RT2 でリフレッシュ | `unknown refresh token` |
+| そのときのアクセストークンで `/userinfo` | 200（期限まで通る。3 節「取り消しが効く範囲」のとおり） |
+| もう一度取り消す | 200 |
+| アクセストークンを取り消そうとする | 400 `unsupported_token_type` |
+| `token` なし | 400 `invalid_request` |
+| 別の client のトークン | 400 `invalid_grant`。行は残った |
+| client_secret なし | 401 `invalid_client` |
+
 ## 5. 実装
 
 ### 決めること
@@ -277,7 +302,7 @@ sequenceDiagram
 | 期限 | 1本 14日、系統 30日 | 3 節「系統と、2つの期限」 |
 | 盗難の検知 | 使用済みが来たら、系統ごと消す。猶予は作らない | 3 節「同時に2回リフレッシュしたら」 |
 | リフレッシュの返事 | アクセストークン、リフレッシュトークン、`expires_in`、scope。ID トークンは入れない | 4 節の図「期限切れとリフレッシュ」の下 |
-| `/revoke` | リフレッシュトークンだけを受ける。系統ごと消す。知らないトークンでも 200 | アクセストークンは JWT で、取り消しても `/userinfo` は記録を見ないので意味がない |
+| `/revoke` | リフレッシュトークンだけを受ける（アクセストークンは `unsupported_token_type` で断る）。系統ごと消す。知らないトークンでも 200 | アクセストークンは JWT で、取り消しても `/userinfo` は記録を見ないので意味がない |
 | Discovery | `grant_types_supported` に `refresh_token`、`revocation_endpoint` を足す | client が口を見つけられるように |
 | demo-app | セッションにトークンを持つ。トップに「/userinfo を呼ぶ」ボタン、アクセストークンの中身と期限。401 ならリフレッシュして1回だけやり直す。ログアウトで `/revoke` | 期限切れ、リフレッシュ、取り替えを画面で見られるように |
 
@@ -300,3 +325,25 @@ sequenceDiagram
 | 5-c | `/revoke` |
 | 5-d | demo-app：トークンをセッションに、「/userinfo を呼ぶ」、401 でリフレッシュ、ログアウトで `/revoke`。手元で通しで試す（期限切れ、盗難の検知も） |
 | 5-e | 本番に載せる（マイグレーションが流れる。鍵や共通基盤は変えない） |
+
+### 5-d：demo-app から通しで試す
+
+demo-app の画面（トップ）に、アクセストークンの期限と中身、リフレッシュトークンの頭8文字、「/userinfo を呼ぶ」「盗難のまね：1つ前のリフレッシュトークンを出す」「ログアウト」のボタン、何が起きたかの記録を出す。
+
+手元で試すとき（[README](../../README.md) の「手元での開発」）：
+
+- demo-app は `npm run demo:local`。設定は `demo-app/local.env`（手元の auth に登録した client_secret。git に入らない）。本番を向く `demo-app/.env` とは分けた
+- 期限切れを早く見るには、auth を `ACCESS_TOKEN_TTL_S=10` を付けて起動する（既定は5分。本番では設定しない）。auth は時計のずれを1分許すので、実際に 401 になるのは 10秒 ＋ 1分後
+
+ブラウザ（Playwright）で通した結果（`ACCESS_TOKEN_TTL_S=10`）：
+
+| 操作 | 記録（demo-app の画面） | auth の監査ログ |
+| --- | --- | --- |
+| ログイン | ログインした。アクセストークンとリフレッシュトークンを受け取った | `token_issued` |
+| 「/userinfo を呼ぶ」（期限内） | /userinfo を呼んだ（200） | （なし。DB を引かない） |
+| 75秒待って「/userinfo を呼ぶ」 | /userinfo が 401 を返した（`error_description="expired"`）→ リフレッシュした → /userinfo を呼んだ（200）。リフレッシュトークンの頭8文字が変わった | `token_refreshed` |
+| 「盗難のまね」 | 400 invalid_grant refresh token already used | `refresh_token_reuse_detected` |
+| 75秒待って「/userinfo を呼ぶ」 | 「リフレッシュできませんでした（invalid_grant）。ログインし直してください」。今のリフレッシュトークンも、系統ごと消えていた | `token_error`（unknown refresh token） |
+| もう一度「auth でログイン」 | auth の画面を通らずに戻る（auth のセッションは残っている）。新しい系統 | `token_issued` |
+| 「ログアウト」 | ログインしていない画面 | `refresh_token_revoked`。demo-app のリフレッシュトークンの行が0になった |
+

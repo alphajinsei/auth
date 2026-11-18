@@ -34,7 +34,7 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | --- | --- |
 | `src/index.ts` | 入口（Hono）。POST の `Origin` の確認、`Cache-Control: no-store`、`GET /health`（LB 用。DB を見ない）、`GET /api/health`（DB まで見る）。`PUBLIC_ORIGIN`（外から見た自分の origin）が必須 |
 | `src/routes/login.ts` | `GET/POST /login`、`GET /account`、`POST /logout`。失敗の回数による一時停止と、監査ログ（標準出力の JSON） |
-| `src/routes/oidc.ts` | OIDC の OP：Discovery、`/jwks.json`、`/authorize`、`/token`（認可コードの引き換えと、リフレッシュトークンの取り替え・使用済みの検知）、`/userinfo` |
+| `src/routes/oidc.ts` | OIDC の OP：Discovery、`/jwks.json`、`/authorize`、`/token`（認可コードの引き換えと、リフレッシュトークンの取り替え・使用済みの検知）、`/revoke`（リフレッシュトークンを系統ごと取り消す）、`/userinfo` |
 | `src/jwt.ts` | ID トークンとアクセストークンの署名の鍵（ES256）、JWKS、JWT を作る・署名を確かめる |
 | `src/access-token.ts` | アクセストークン（JWT、`typ: at+jwt`、5分）を作る・確かめる。`/userinfo` は DB を引かずにこれで確かめる |
 | `src/session.ts` | サーバー側のセッション。Cookie `__Host-session` に乱数の ID、DB にその SHA-256 |
@@ -48,7 +48,7 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | `src/send-test-mail.ts` | 試しに1通送る（`node dist/send-test-mail.js <宛先>`）。誰でも送らせられる口になるので、Web の API にはしない |
 | `src/migrate.ts` | マイグレーションを流す（デプロイのとき、コンテナの中で `node dist/migrate.js`） |
 | `migrations/` | drizzle-kit が作ったマイグレーションの SQL とスナップショット。手で書かない |
-| `demo-app/` | 「auth でログイン」を試す RP（Hono、ポート 4000、DB なし）。`src/rp.ts` が Discovery・JWKS・ID トークンの検証、`src/index.ts` が `/login`・`/callback`・トップの画面。設定は `demo-app/.env`（git に入らない。ひな形は `.env.example`）。本番には載せない |
+| `demo-app/` | 「auth でログイン」を試す RP（Hono、ポート 4000、DB なし）。`src/rp.ts` が Discovery・JWKS・ID トークンの検証、`src/index.ts` が `/login`・`/callback`・トップの画面、ステップ5の `/call`（401 ならリフレッシュ）・`/replay`（盗難のまね）・`/logout`（`/revoke`）。設定は `demo-app/.env`（本番向け）と `demo-app/local.env`（手元向け）。どちらも git に入らない。ひな形は `.env.example`。本番には載せない |
 | `Dockerfile` | ビルドして `dist/` を作り、実行用のイメージに入れる |
 | `compose.yaml` | 本番と手元で共通。ポートは `.env` の `APP_PORT`（本番は台帳の 8002） |
 | `compose.override.yaml` | 手元だけ（自動で重なる）。HeatWave と同じ版の MySQL のコンテナと、メールの受け口の Mailpit、その接続情報 |
@@ -84,9 +84,12 @@ demo-app（「auth でログイン」を試す RP。[demo-app/](demo-app/)、ス
 
 ```bash
 npx tsx --env-file=local.env src/admin.ts create-client demo-app http://localhost:4000/callback "デモのアプリ"   # client_secret が一度だけ出る
-cp demo-app/.env.example demo-app/.env   # CLIENT_SECRET に上の値を入れる（.env は git に入らない）
-npm run demo                             # http://localhost:4000 → 「auth でログイン」
+cp demo-app/.env.example demo-app/local.env   # ISSUER を手元の auth に、CLIENT_SECRET に上の値を入れる（git に入らない）
+npm run demo:local                            # http://localhost:4000 → 「auth でログイン」
 ```
+
+- 本番の auth を向くのが `demo-app/.env`（`npm run demo`）、手元の auth を向くのが `demo-app/local.env`（`npm run demo:local`）。どちらも git に入らない。中身の形は `.env.example` と同じで、`ISSUER` と `CLIENT_SECRET` だけが違う
+- アクセストークンの期限切れとリフレッシュを早く試すには、auth を `ACCESS_TOKEN_TTL_S=10` を付けて起動する（既定は5分。本番では設定しない）
 
 - 手元で送ったメールを見る：`docker compose up -d mailpit` → `npx tsx --env-file=local.env src/send-test-mail.ts you@example.com` → http://localhost:8025（外へは出ない）
 - 手元の DB の中身を見る：`docker compose exec mysql mysql -u app -papp app -e 'SELECT username, failed_count, locked_until FROM users'`

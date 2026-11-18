@@ -1622,3 +1622,60 @@ OIDC では、`/userinfo` は OP（認可サーバー）が持つ API と決ま�
 5-a で `/userinfo` を JWT の検証に替えたあと、`Authorization: Bearer abc.def.ghi` を送ると 500 になった。原因は、検証の関数が投げた例外の文面を、そのまま `WWW-Authenticate` ヘッダーに入れていたこと。`abc` を base64url として読むと意味のないバイト列になり、`JSON.parse` の例外の文面にそれが混ざる。制御文字や引用符を含む値はヘッダーに入れられないので、Hono が返事を作るところで落ちた。
 
 直し方：投げる文面を決まった言葉（`not a JWT`、`unexpected typ`、`unexpected alg` など）だけにし、相手が送った値（typ や alg の中身）を混ぜない。ヘッダーに引用符を入れられると、ヘッダーの形を壊したり、別の項目を書き足したりできる（ヘッダーの注入）ので、500 で済んでいたのはむしろ運がよかった。**相手が送った値を、そのまま返事のヘッダーに写さない**、が教訓。
+
+### Q. これが OAuth 2.0・OIDC の実装の定番なのか。たとえば `/token` で、リフレッシュトークンの依頼と、認可コードの引き換えの両方を受けるなど
+
+定番で、OAuth 2.0 の本体（RFC 6749）がそう決めている。OAuth 2.0 の口は、大きく2つしかない。
+
+| 口 | 通り道 | 誰が呼ぶ | 役目 |
+| --- | --- | --- | --- |
+| 認可エンドポイント（`/authorize`） | 表（ブラウザがリダイレクトで運ぶ） | 利用者のブラウザ | 利用者にログインと同意をしてもらう |
+| トークンエンドポイント（`/token`） | 裏（client のサーバーから直接） | client | 「許可の証拠」と引き換えに、トークンを出す |
+
+`/token` に来る要求は、どれも「client を認証して、許可の証拠を確かめて、同じ形の返事（access_token、token_type、expires_in…）を返す」で共通している。違うのは**何を許可の証拠として出すか**だけなので、それを `grant_type`（grant ＝ 許可）で分けて、1つの口で受ける。
+
+| grant_type | 許可の証拠 | 決めた仕様 |
+| --- | --- | --- |
+| `authorization_code` | 認可コード（＋ PKCE の verifier） | RFC 6749 4.1（ステップ4） |
+| `refresh_token` | リフレッシュトークン | RFC 6749 6（ステップ5） |
+| `client_credentials` | なし（client 自身の権限。利用者がいない、サーバー同士の通信） | RFC 6749 4.4 |
+| `password` | 利用者のパスワードそのもの | RFC 6749 4.3。今は使うなとされている（RFC 9700） |
+| `urn:ietf:params:oauth:grant-type:device_code` | テレビなどの機器に出したコード | RFC 8628 |
+| `urn:ietf:params:oauth:grant-type:jwt-bearer` | 別の発行者が署名した JWT | RFC 7523 |
+| `urn:ietf:params:oauth:grant-type:token-exchange` | 別のトークン | RFC 8693 |
+
+実際の製品も同じ形で、URL の名前が違うだけ（Google は `https://oauth2.googleapis.com/token`、Keycloak は `…/protocol/openid-connect/token`、GitHub は `/login/oauth/access_token`）。名前が製品ごとに違うので、Discovery（`token_endpoint`）で知らせる。
+
+一方、トークンを出す以外の仕事は、別の口に分かれる：`/revoke`（RFC 7009）、`/introspect`（RFC 7662）、`/userinfo`（OIDC）、`/jwks.json`、Discovery、ログアウト（OIDC の `end_session_endpoint`）など。auth の口の並びは、この定番どおり。
+
+### Q. OAuth・OIDC のサーバーを実装するといった場合、ステップ4・ステップ5の内容を網羅して完成か。過不足があれば知りたい
+
+**「自分のサービスのログインを1か所にまとめる」には、ほぼ足りている。**ただ、仕様の上での「完成」（OIDC の OP として名乗れる）には足りないものがあり、製品並みにするなら、さらに多くの拡張がある。3段に分けると次のとおり。
+
+**今あるもの**：認可コード + PKCE、client の登録（管理用のコマンド）、同意、ID トークン、Discovery、JWKS、`/userinfo`、JWT のアクセストークン、リフレッシュトークン（取り替えと盗難の検知）、`/revoke`。OIDC の核と、OAuth 2.0 の今の推奨（RFC 9700）の主な部分。
+
+**1. OIDC Core が、すべての OP に求めているのに、ないもの（15.1 節）**
+
+| 項目 | 中身 | auth は |
+| --- | --- | --- |
+| RS256 での署名 | ID トークンを RSA でも署名できること | ES256 だけ。RP の多くは ES256 も読めるので困らないが、厳密には満たさない |
+| `prompt` | `none`（画面を出さずに、ログイン済みかだけ確かめる）、`login`（必ずログインし直させる）、`consent` | 受け取らない |
+| `max_age` と auth_time | 「N秒以内にログインした人でなければ、ログインし直させて」 | auth_time は入れているが、max_age を見ない |
+| `display`、`ui_locales`、`acr_values` | 画面の形、言語、ログインの強さの希望 | 受け取らない（多くは「受け取って、できる範囲で従う」だけでよい） |
+
+**2. 実際に運用すると欲しくなるもの**
+
+| 項目 | なぜ |
+| --- | --- |
+| ログアウト（RP-Initiated Logout、Back-Channel Logout） | 今は demo-app からログアウトしても auth のセッションが残る。auth ごと、ほかの RP ごとログアウトさせる仕組み |
+| 署名の鍵の入れ替え | JWKS に新旧を並べ、止めずに鍵を替える。鍵が漏れたときの手順 |
+| 同意の管理画面 | 利用者が「このアプリへの許可をやめる」を自分でできる（今は DB を直接消すしかない） |
+| client の管理 | client_secret の作り直し、redirect_uri の追加。今は登録しかない |
+| public client（secret を持てない SPA やスマホのアプリ） | client_secret なしで、PKCE だけで受ける。リフレッシュトークンの取り替えが本当に効くのはここ（来歴の 7 節） |
+| `/token` の回数の制限、監視 | 総当たりや、盗難の検知の通知 |
+
+**3. 用途によって足す拡張**：client_credentials（サーバー同士）、デバイスの流れ（RFC 8628）、Introspection（opaque のトークンをよその API が確かめる）、動的な client の登録（RFC 7591）、PAR（RFC 9126。/authorize の要求を先に裏で送る）、DPoP（RFC 9449）や mTLS（送り手に結び付ける。来歴の 8 節）、FAPI（銀行などの厳しいプロファイル）、ペアワイズの sub（RP ごとに違う sub）など。
+
+自分の OP がどこまで仕様に合っているかは、OpenID Foundation が公開している適合性のテスト（conformance suite）で確かめられる。たとえば「Basic OP」のテストに通すと、上の 1 の抜けがそのまま失敗として出るはず。
+
+ロードマップの残り（ステップ5の認可モデル）は、OAuth・OIDC の外側で、「トークンに載せたロールを、アプリがどう使うか」の話。上の表のどれかを足すかは、ステップ5のあとで決めればよい。実用の面で優先するなら、ログアウトと鍵の入れ替えが先。

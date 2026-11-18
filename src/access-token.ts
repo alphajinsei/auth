@@ -4,7 +4,9 @@
 import { randomBytes } from 'node:crypto';
 import { kid, signJwt, verifyJwt } from './jwt.js';
 
-export const ACCESS_TOKEN_TTL_S = 5 * 60; // 要素①：短命。取り消しが効かない幅を、この長さに収める
+// 要素①：短命。取り消しが効かない幅を、この長さに収める。
+// 手元で期限切れを早く試すときだけ、環境変数 ACCESS_TOKEN_TTL_S で縮める（本番の .env には書かない）
+export const ACCESS_TOKEN_TTL_S = Number(process.env.ACCESS_TOKEN_TTL_S) || 5 * 60;
 const TYP = 'at+jwt'; // RFC 9068 2.1
 const SKEW_S = 60; // 時計のずれの許し。auth の中で作って auth の中で確かめる今は要らないが、API が別のサーバーになったときのために
 

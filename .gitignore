@@ -4,3 +4,5 @@ dist/
 .terraform/
 *.tfstate
 *.tfstate.*
+# demo-app の手元用の設定（手元の auth を向く。CLIENT_SECRET は手元の auth に登録したときのもの）
+demo-app/local.env

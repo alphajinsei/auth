@@ -8,6 +8,7 @@ export type Discovery = {
 	authorization_endpoint: string;
 	token_endpoint: string;
 	userinfo_endpoint: string;
+	revocation_endpoint?: string; // ステップ5（RFC 7009）
 	jwks_uri: string;
 };
 export type Jwks = { keys: (JsonWebKey & { kid: string })[] };

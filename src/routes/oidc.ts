@@ -2,7 +2,7 @@
 // 番号の読み方は src/webauthn.ts と同じ（「ログイン 4」＝ 4-oidc.md の図「ログイン」の 4 番の矢印、「要素②」＝「1. 技術の要素」の ②）
 // 4-a：Discovery と JWKS（図「準備」）。4-b：/authorize（図「ログイン」の 4〜9）。4-c：/token（ログイン 11〜12）、/userinfo（図「/userinfo」）
 // ステップ5（docs/steps/5-tokens.md）：5-a でアクセストークンを JWT にし、/userinfo は図「API を呼ぶ」の形で確かめる。
-// 5-b でリフレッシュトークン（/token の grant_type=refresh_token。図「期限切れとリフレッシュ」「盗難の検知」）
+// 5-b でリフレッシュトークン（/token の grant_type=refresh_token。図「期限切れとリフレッシュ」「盗難の検知」）。5-c で /revoke（図「ログアウトと取り消し」）
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { and, eq, isNull, lt } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
@@ -26,6 +26,8 @@ oidc.get('/.well-known/openid-configuration', (c) =>
 		authorization_endpoint: `${issuer}/authorize`,
 		token_endpoint: `${issuer}/token`,
 		userinfo_endpoint: `${issuer}/userinfo`,
+		revocation_endpoint: `${issuer}/revoke`, // RFC 8414 の項目（OAuth の認可サーバーの Metadata）。OIDC Discovery にはないが、並べてよい
+		revocation_endpoint_auth_methods_supported: ['client_secret_basic'],
 		jwks_uri: `${issuer}/jwks.json`,
 		scopes_supported: ['openid', 'profile'],
 		response_types_supported: ['code'], // 認可コードの流れだけ（implicit は出さない）
@@ -384,6 +386,33 @@ async function reuseDetected(c: Context, row: { familyId: string; clientId: stri
 	audit('refresh_token_reuse_detected', { clientId: row.clientId, userId: row.userId, familyId: row.familyId });
 	return tokenError(c, 'invalid_grant', 'refresh token already used');
 }
+
+// ---- /revoke（図「ログアウトと取り消し」。RFC 7009）。client が「このリフレッシュトークンを無効にして」と頼む口（要素⑧） ----
+
+// ログアウト 3：POST /revoke（token、client_id と client_secret）
+oidc.post('/revoke', async (c) => {
+	const client = await authenticateClient(c);
+	if (!client) return tokenError(c, 'invalid_client', 'client authentication failed', 401);
+	const body = (await c.req.parseBody()) as Record<string, string>;
+	const token = body.token ?? '';
+	if (!token) return tokenError(c, 'invalid_request', 'token is required');
+
+	// アクセストークン（JWT。「.」を含む）は取り消せない。/userinfo は記録を見ないので、取り消しても効かない。
+	// 黙って 200 を返すと「取り消せた」と誤解させるので、RFC 7009 2.2.1 の unsupported_token_type で断る
+	if (token.includes('.')) return tokenError(c, 'unsupported_token_type', 'only refresh tokens can be revoked');
+
+	// ログアウト 3 のあとの Note：トークンがこの client のものか（RFC 7009 2.1：別の client のトークンは取り消させない）
+	const [row] = await db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, sha256hex(token)));
+	if (row && row.clientId !== client.id) return tokenError(c, 'invalid_grant', 'token was issued to another client');
+
+	// ログアウト 4：その系統を全部消す（使用済みのものも、取り替えで続いたものも）
+	if (row) {
+		await revokeFamily(row.familyId);
+		audit('refresh_token_revoked', { clientId: client.id, userId: row.userId, familyId: row.familyId });
+	}
+	// ログアウト 5：知らないトークン（期限切れ、すでに消えた）でも 200（RFC 7009 2.2）。client がすることは「捨てた」で同じなので
+	return c.body(null, 200);
+});
 
 // ---- /userinfo（図「API を呼ぶ」。docs/steps/5-tokens.md）。アクセストークンを見せれば、利用者の情報を返す ----
 // auth の中にあるが、ここでは「認可サーバーとは別の API」として振る舞う：トークンの確認に、auth の DB を使わない
