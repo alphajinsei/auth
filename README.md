@@ -7,7 +7,7 @@
 - 載せている共通基盤：[oci-platform](https://github.com/alphajinsei/oci-platform)。仕様（アプリが受け取るもの・守ること）、運用、困ったときは [その README](https://github.com/alphajinsei/oci-platform#readme)
 - テンプレートにしたサンプル：[sample-oci-vm-docker](https://github.com/alphajinsei/sample-oci-vm-docker)
 
-> 段1（パスワードでのログインとセッション）まで。進み具合は [ロードマップ](docs/roadmap.md)。
+> ステップ1（パスワードでのログインとセッション）まで。進み具合は [ロードマップ](docs/roadmap.md)。
 
 ## 1. このサービスの用途
 
@@ -77,7 +77,7 @@ docker compose run --rm app node dist/migrate.js
 docker compose down                              # データは残る（消すなら down -v）
 ```
 
-demo-app（「auth でログイン」を試す RP。[demo-app/](demo-app/)、段5で独立させるまでの仮住まい）：
+demo-app（「auth でログイン」を試す RP。[demo-app/](demo-app/)、ステップ5で独立させるまでの仮住まい）：
 
 ```bash
 npx tsx --env-file=local.env src/admin.ts create-client demo-app http://localhost:4000/callback "デモのアプリ"   # client_secret が一度だけ出る
@@ -120,9 +120,9 @@ npm run deploy
 
 ## 5. このサービスを使う
 
-アプリから使う（段4で作る）：管理用のコマンドでクライアントを登録し、`https://auth.alphajinsei.com/.well-known/openid-configuration` を OIDC のライブラリに渡す。例は demo-app（段4で作る）。
+アプリから使う（ステップ4で作る）：管理用のコマンドでクライアントを登録し、`https://auth.alphajinsei.com/.well-known/openid-configuration` を OIDC のライブラリに渡す。例は demo-app（ステップ4で作る）。
 
-利用者を作る（段1で作る）：app VM で `docker compose exec app node dist/admin.js create-user <名前>`。登録の画面はない。
+利用者を作る（ステップ1で作る）：app VM で `docker compose exec app node dist/admin.js create-user <名前>`。登録の画面はない。
 
 ## 6. この方式の注意点
 

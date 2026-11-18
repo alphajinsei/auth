@@ -117,7 +117,7 @@ resource "oci_vault_secret" "totp_key" {
   }
 }
 
-# ID トークン（段4）に署名する鍵。ES256（P-256）。
+# ID トークン（ステップ4）に署名する鍵。ES256（P-256）。
 # 秘密鍵は Terraform の state（OCI の Object Storage）と Vault にだけ置く。-replace で作り直すと、
 # それまでに出した ID トークンは検証できなくなる（JWKS に新旧を並べる入れ替えは、まだ作っていない）
 resource "tls_private_key" "oidc_signing" {

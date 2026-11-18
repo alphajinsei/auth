@@ -70,7 +70,7 @@ login.post('/login', async (c) => {
 		return fail();
 	}
 
-	// TOTP を登録（確認済み）していれば、仮のセッションにして6桁の画面へ（段2の図「ログイン」）。
+	// TOTP を登録（確認済み）していれば、仮のセッションにして6桁の画面へ（ステップ2の図「ログイン」）。
 	// 失敗の回数は、ここではまだ0に戻さない。戻すと「パスワードを通して回数を0に戻し、6桁を4回試す」を
 	// くり返せて、6桁を無制限に試せてしまう。ログインが最後まで済んだときにだけ戻す
 	const [cred] = await db.select().from(totpCredentials).where(eq(totpCredentials.userId, user.id));
@@ -84,11 +84,11 @@ login.post('/login', async (c) => {
 	audit('login_ok', username);
 	await startSession(c, user.id, 'full', 'pwd');
 	// 303：POST の結果として、別の URL を GET で開き直させる（再読み込みでフォームが再送されない）。
-	// /authorize から寄り道してきたなら、そこへ戻る（段4）
+	// /authorize から寄り道してきたなら、そこへ戻る（ステップ4）
 	return c.redirect(takeReturnTo(c), 303);
 });
 
-// ---- 2要素目：TOTP の6桁（段2の図「ログイン」の後半） ----
+// ---- 2要素目：TOTP の6桁（ステップ2の図「ログイン」の後半） ----
 
 login.get('/login/totp', async (c) => {
 	if (!(await pendingUser(c))) return c.redirect('/login', 303);

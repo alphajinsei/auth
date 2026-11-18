@@ -31,7 +31,7 @@ const b64json = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64ur
 export function signJwt(payload: Record<string, unknown>): string {
 	const signingInput = `${b64json({ alg: 'ES256', typ: 'JWT', kid })}.${b64json(payload)}`;
 	// ieee-p1363：署名を r と s を32バイトずつ並べた64バイトにする（JWS の ES256 の決まり、RFC 7518）。
-	// Node.js の既定は DER（ASN.1）で、段3の WebAuthn の署名はそちらだった。同じ ES256 でも、入れ物の形が違う
+	// Node.js の既定は DER（ASN.1）で、ステップ3の WebAuthn の署名はそちらだった。同じ ES256 でも、入れ物の形が違う
 	const signature = sign('sha256', Buffer.from(signingInput), { key: privateKey, dsaEncoding: 'ieee-p1363' });
 	return `${signingInput}.${signature.toString('base64url')}`;
 }

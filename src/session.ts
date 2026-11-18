@@ -17,9 +17,9 @@ type Stage = 'password' | 'full';
 // セッション ID は 256 ビットの乱数なので、総当たりできない。パスワードと違い、遅いハッシュは要らない
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-// ログインに成功したとき（段1の図「ログイン」の 8〜9）。
+// ログインに成功したとき（ステップ1の図「ログイン」の 8〜9）。
 // TOTP の利用者は、パスワードが通った時点で stage='password'（仮）、6桁が通ったら stage='full'（本物）で呼ぶ
-// （段2の図「ログイン」）。どちらも ID を新しく作るので、仮から本物に上がる瞬間にも ID が変わる
+// （ステップ2の図「ログイン」）。どちらも ID を新しく作るので、仮から本物に上がる瞬間にも ID が変わる
 export async function startSession(c: Context, userId: string, stage: Stage, amr: string) {
 	// セッション固定の対策：ブラウザが持ってきた古い ID は使わず、捨てて作り直す
 	const old = getCookie(c, COOKIE);
@@ -49,7 +49,7 @@ async function sessionUser(c: Context, stage: Stage) {
 	return row ?? null;
 }
 
-// 以後のリクエストで、誰かを判断する（段1の図「以後のリクエスト」）。本物のセッションだけを返す。
+// 以後のリクエストで、誰かを判断する（ステップ1の図「以後のリクエスト」）。本物のセッションだけを返す。
 // 仮のセッション（6桁がまだ）では、アカウントの画面などは開けない
 export const currentUser = (c: Context) => sessionUser(c, 'full');
 
@@ -63,7 +63,7 @@ export async function endSession(c: Context) {
 	deleteCookie(c, COOKIE, { path: '/', secure: true });
 }
 
-// ---- ログインのあとの戻り先（段4）。/authorize がログイン画面に寄り道させるとき、戻る先を覚えておく ----
+// ---- ログインのあとの戻り先（ステップ4）。/authorize がログイン画面に寄り道させるとき、戻る先を覚えておく ----
 // ログインの方法（パスワード、TOTP、パスキー）によって通る画面が違うので、フォームで持ち回らず、短命の Cookie に入れる
 const RETURN_TO = '__Host-return-to';
 

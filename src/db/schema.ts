@@ -2,13 +2,13 @@ import { bigint, datetime, int, mysqlTable, primaryKey, text, timestamp, varchar
 
 // 利用者。登録の画面はなく、管理用のコマンド（src/admin.ts）で作る
 export const users = mysqlTable('users', {
-	// UUID。外に見せる利用者の ID（段4で OIDC の sub になる）。連番にしないのは、人数や登録順を推測させないため
+	// UUID。外に見せる利用者の ID（ステップ4で OIDC の sub になる）。連番にしないのは、人数や登録順を推測させないため
 	id: varchar('id', { length: 36 }).primaryKey(),
 	username: varchar('username', { length: 64 }).notNull().unique(),
 	// Argon2id のハッシュ。アルゴリズム・パラメータ・ソルトも中に入っている（$argon2id$v=19$m=...,t=...,p=...$ソルト$ハッシュ）
-	// 空ならパスワードなし（パスキーだけのアカウント。段3-c）
+	// 空ならパスワードなし（パスキーだけのアカウント。ステップ3-c）
 	passwordHash: varchar('password_hash', { length: 255 }),
-	// 連続して失敗した回数と、止めている期限（段1-c）
+	// 連続して失敗した回数と、止めている期限（ステップ1-c）
 	failedCount: int('failed_count').notNull().default(0),
 	lockedUntil: datetime('locked_until'),
 	createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -71,7 +71,7 @@ export const webauthnChallenges = mysqlTable('webauthn_challenges', {
 	expiresAt: datetime('expires_at').notNull(),
 });
 
-// ---- OIDC（段4）。流れ：docs/steps/4-oidc.md ----
+// ---- OIDC（ステップ4）。流れ：docs/steps/4-oidc.md ----
 
 // 登録した RP（client）。管理用のコマンド（admin create-client）で作る
 export const oauthClients = mysqlTable('oauth_clients', {
@@ -118,7 +118,7 @@ export const oauthConsents = mysqlTable(
 	(t) => [primaryKey({ columns: [t.userId, t.clientId] })],
 );
 
-// アクセストークン（/userinfo を呼ぶ許可証）。段4は「DB で引く乱数」（セッション ID と同じ形）。段5で JWT と比べる
+// アクセストークン（/userinfo を呼ぶ許可証）。ステップ4は「DB で引く乱数」（セッション ID と同じ形）。ステップ5で JWT と比べる
 export const accessTokens = mysqlTable('access_tokens', {
 	tokenHash: varchar('token_hash', { length: 64 }).primaryKey(), // トークンの SHA-256。トークンそのものは置かない
 	clientId: varchar('client_id', { length: 64 })

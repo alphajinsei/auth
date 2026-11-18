@@ -1,8 +1,8 @@
-# 段4：OIDC（認可コード + PKCE）
+# ステップ4：OIDC（認可コード + PKCE）
 
 最終更新：2026-11-15
 
-背景は [番外編：OAuth 2.0 と OpenID Connect の来歴](../notes/extra-history-oauth-oidc.md)、用語は [番外編：OAuth・OIDC の用語](../notes/extra-auth-terms.md)。demo-app の「auth でログイン」を押すと auth に移り、段1〜3のどれかでログインし、demo-app に戻ってくると、demo-app が「誰がログインしたか」を知っている、までを作る。
+背景は [番外編：OAuth 2.0 と OpenID Connect の来歴](../notes/extra-history-oauth-oidc.md)、用語は [番外編：OAuth・OIDC の用語](../notes/extra-auth-terms.md)。demo-app の「auth でログイン」を押すと auth に移り、ステップ1〜3のどれかでログインし、demo-app に戻ってくると、demo-app が「誰がログインしたか」を知っている、までを作る。
 
 ## この文書の読み方
 
@@ -14,7 +14,7 @@
 | 4. 流れ | 誰が何を作るかの文章と、シーケンス図（ログイン、準備、2つ目以降のログイン） |
 | 5. 実装 | 決めること、テーブル、小分け |
 
-**番号が2種類ある**のは段3と同じ。1 の表の ①〜⑨ は**要素**の番号、4 の図の丸数字は**手順**（矢印）の番号。コードのコメントでは「要素③」「ログイン 7」「ログイン 7 のあとの Note」と書き分ける。
+**番号が2種類ある**のはステップ3と同じ。1 の表の ①〜⑨ は**要素**の番号、4 の図の丸数字は**手順**（矢印）の番号。コードのコメントでは「要素③」「ログイン 7」「ログイン 7 のあとの Note」と書き分ける。
 
 ## 1. 技術の要素：9つの組み合わせ
 
@@ -32,7 +32,7 @@
 
 - **ログイン** ＝ demo-app が ⑥⑦⑨ の乱数を作る → ① ブラウザを auth へ送る → auth は ② を確かめ、利用者にログインさせ、③ 同意をもらう → ④ コードを ① で demo-app へ返す → demo-app は ⑦ を確かめ、⑤ 裏の通信で ⑥ の乱数と一緒にコードを引き換える → auth は ②④⑤⑥ を確かめ、⑧⑨ の ID トークンに署名して返す → demo-app は ⑧⑨ を確かめる
 
-段3のパスキーと同じ骨格がある。⑨ の nonce は段3の challenge、⑧ の aud は段3の RP ID、⑧ の署名は段3の署名に当たる。違うのは、**署名する側が利用者の認証器ではなく auth** で、**検証する側が auth ではなく demo-app** なこと（RP が層によって違う、の OIDC の層）。
+ステップ3のパスキーと同じ骨格がある。⑨ の nonce はステップ3の challenge、⑧ の aud はステップ3の RP ID、⑧ の署名はステップ3の署名に当たる。違うのは、**署名する側が利用者の認証器ではなく auth** で、**検証する側が auth ではなく demo-app** なこと（RP が層によって違う、の OIDC の層）。
 
 ## 2. 登場人物
 
@@ -46,7 +46,7 @@
 | scope | RP が求めるもの。`openid` があれば OIDC の要求 | `openid profile`（ID と、ユーザー名） |
 | 認可コード | ブラウザが運ぶ引換券。60秒、一度きり | 32バイトの乱数 |
 | ID トークン | 誰が、いつ、どうやってログインしたか。auth が署名した JWT | ES256 で署名 |
-| アクセストークン | `/userinfo` を呼べる許可証（段5で本格的に使う） | 段4は乱数（DB で引く）。段5で JWT にするか決める |
+| アクセストークン | `/userinfo` を呼べる許可証（ステップ5で本格的に使う） | ステップ4は乱数（DB で引く）。ステップ5で JWT にするか決める |
 | JWKS | auth の公開鍵の一覧。RP は ID トークンの署名をこれで確かめる | `/jwks.json` |
 | Discovery | auth の設定（各 URL、使える方式）の一覧 | `/.well-known/openid-configuration` |
 
@@ -81,7 +81,7 @@ auth は demo-app のことを事前に知っておく必要がある。登録�
 
 | Cookie | 誰のもの | 意味 |
 | --- | --- | --- |
-| auth のセッション（`__Host-session`） | auth | 「この利用者は auth にログイン済み」。段1〜3のもの |
+| auth のセッション（`__Host-session`） | auth | 「この利用者は auth にログイン済み」。ステップ1〜3のもの |
 | demo-app のセッション | demo-app | 「この利用者は demo-app にログイン済み」。ID トークンを確かめたあとに demo-app が作る |
 
 2つ目のアプリが「auth でログイン」したとき、auth のセッションが生きていれば、ログイン画面を出さずにすぐ戻す。**これが SSO の正体**（4 の「2つ目以降のログイン」の図）。逆に、demo-app からログアウトしても auth のセッションは残る（ログアウトの連携は [設計](../design.md) の「今後の発展」）。
@@ -110,7 +110,7 @@ PKCE は、もとは client_secret を安全に持てないアプリ（スマホ
 
 1. **demo-app** が乱数を3つ作る（state、nonce、code_verifier）。code_verifier のハッシュ（code_challenge）も作る。3つの元の値は、短命の Cookie に入れて覚える。
 2. **demo-app** が、ブラウザを auth の `/authorize` へリダイレクトさせる。URL に client_id、redirect_uri、scope、state、nonce、code_challenge を載せる。
-3. **auth** が client_id と redirect_uri を登録と照らす。利用者が auth にログインしていなければ、ログイン画面（段1〜3）を挟む。同意がまだなら、同意画面を出す。
+3. **auth** が client_id と redirect_uri を登録と照らす。利用者が auth にログインしていなければ、ログイン画面（ステップ1〜3）を挟む。同意がまだなら、同意画面を出す。
 4. **auth** が認可コードを作り、そのコードに「誰が、どうやってログインしたか（amr）、どの client に、どの redirect_uri で、code_challenge、nonce」を結び付けて DB に置く。ブラウザを redirect_uri へ、コードと state を付けてリダイレクトさせる。
 5. **demo-app** が、戻ってきた state を Cookie の値と照らす。
 6. **demo-app** のサーバーが、auth の `/token` に直接、コード、redirect_uri、code_verifier、client_id と client_secret を送る。
@@ -134,7 +134,7 @@ sequenceDiagram
   R-->>B: 302 → auth の /authorize（client_id、redirect_uri、scope、state、nonce、code_challenge）
   B->>A: GET /authorize（同じもの）
   Note over A: client_id が登録済みか、redirect_uri が登録と完全一致するか
-  Note over A: auth にログインしていなければ、ログイン画面へ（段1〜3）。済んだら /authorize に戻る
+  Note over A: auth にログインしていなければ、ログイン画面へ（ステップ1〜3）。済んだら /authorize に戻る
   A-->>B: 同意画面「demo-app に、あなたの ID とユーザー名を渡します」
   U->>B: 「許可する」
   B->>A: POST /authorize（同意）
@@ -183,11 +183,11 @@ sequenceDiagram
 - **redirect_uri の完全一致**（ログイン 4 のあとの 1つ目の Note）。前方一致や、ワイルドカードを許すと、`https://demo.example.com/callback/../evil` のような抜け道で、コードを別の場所に送らせられる。登録した文字列と、1文字残らず同じであることを求める。
 - **redirect_uri を `/token` でもう一度送る**のは、コードを出したときの redirect_uri と同じかを auth が確かめるため（コードを別の client の流れに持ち込ませない）。
 - **同意は記録する**。同じ利用者・同じ client・同じ scope なら、次からは同意画面を出さない（「2つ目以降のログイン」）。
-- **ID トークンの amr** には、段1〜3で記録したセッションの amr（`pwd`、`pwd otp mfa`、`hwk mfa` など）をそのまま入れる。demo-app は、パスキーに一切触れずに「多要素でログインした」と分かる。
+- **ID トークンの amr** には、ステップ1〜3で記録したセッションの amr（`pwd`、`pwd otp mfa`、`hwk mfa` など）をそのまま入れる。demo-app は、パスキーに一切触れずに「多要素でログインした」と分かる。
 - 断るときの扱い。redirect_uri が登録と違う、client_id が不明、のときは、**redirect_uri へ戻さず**、auth の画面にエラーを出す（偽の redirect_uri にエラーを送ると、それ自体が攻撃の足がかりになる）。それ以外（利用者が同意を断った、など）は、redirect_uri に `error=access_denied` と state を付けて戻す。
 - **`/token` の失敗は、どこで外れても `invalid_grant`**（コードが不明・使用済み、期限切れ、client 違い、redirect_uri 違い、PKCE 違い）。どこが違ったかを相手に教えない（`error_description` には書くが、auth のログで追うためのもの）。client の認証の失敗だけは 401 `invalid_client`。
 - **失敗してもコードは消える**。取り出した時点で消すので、PKCE を間違えたら、そのコードは二度と使えない（横取りした人が verifier を総当たりできない）。
-- **使い回しの検知はしていない**。仕様は「同じコードが2回来たら、1回目で出したトークンも取り消すべき」（RFC 6749 4.1.2）としているが、そのためには使ったコードと出したトークンの結び付きを残す必要がある。段4では、消すだけにする。
+- **使い回しの検知はしていない**。仕様は「同じコードが2回来たら、1回目で出したトークンも取り消すべき」（RFC 6749 4.1.2）としているが、そのためには使ったコードと出したトークンの結び付きを残す必要がある。ステップ4では、消すだけにする。
 - **寿命**。認可コード 60秒、ID トークン 10分（受け取ってすぐ確かめて使い終わるので、短くてよい）、アクセストークン 1時間。
 - **amr は配列**で入れる（RFC 8176。`"pwd otp mfa"` は `["pwd", "otp", "mfa"]` になる）。DB とセッションでは空白区切りの文字列で持っている。
 
@@ -263,7 +263,7 @@ sequenceDiagram
 | /userinfo 2 のあとの Note | 期限、scope | 期限切れ・不明は 401 `invalid_token`（`WWW-Authenticate: Bearer error="invalid_token"`）、openid がなければ 403 `insufficient_scope` |
 | /userinfo 3 | sub、preferred_username | `c.json({ sub, preferred_username })`。sub は ID トークンと同じ値 |
 
-段4では、アクセストークンを「DB で引く乱数」にする（セッション ID と同じ形）。段5で、JWT にして API が自分で検証する形（DB を引かない）と比べる。
+ステップ4では、アクセストークンを「DB で引く乱数」にする（セッション ID と同じ形）。ステップ5で、JWT にして API が自分で検証する形（DB を引かない）と比べる。
 
 ## 5. 実装
 
@@ -271,12 +271,12 @@ sequenceDiagram
 
 | 項目 | 案 | 理由 |
 | --- | --- | --- |
-| ID トークンの署名の方式 | ES256（P-256） | 段3で検証した方式と同じ。鍵も署名も短い |
-| 署名の秘密鍵の置き場所 | Terraform で作って Vault に置き、デプロイで環境変数に渡す（TOTP の鍵と同じ） | 段2で決めた形をそのまま使う。鍵の入れ替えは、JWKS に新旧の両方を載せれば止めずにできる（今回は作らない） |
-| JWT の作り方 | 自分で書く（ヘッダー・中身の base64url、`crypto.sign`） | 段3で署名の検証を書いたので、作る側も小さい。ライブラリ（`jose`）は使わない |
+| ID トークンの署名の方式 | ES256（P-256） | ステップ3で検証した方式と同じ。鍵も署名も短い |
+| 署名の秘密鍵の置き場所 | Terraform で作って Vault に置き、デプロイで環境変数に渡す（TOTP の鍵と同じ） | ステップ2で決めた形をそのまま使う。鍵の入れ替えは、JWKS に新旧の両方を載せれば止めずにできる（今回は作らない） |
+| JWT の作り方 | 自分で書く（ヘッダー・中身の base64url、`crypto.sign`） | ステップ3で署名の検証を書いたので、作る側も小さい。ライブラリ（`jose`）は使わない |
 | client の登録 | 管理用のコマンド（`admin create-client demo-app http://localhost:4000/callback`）。client_secret は一度だけ表示し、DB にはハッシュを置く | 利用者と同じ方針。登録の画面は作らない |
-| demo-app の RP の実装 | 段4では、検証を自分で書く（Discovery、JWKS、署名、iss・aud・exp・nonce） | RP が何を確かめるかを見るため。段5で独立したリポジトリ（ひな形）にするとき、ライブラリ（`openid-client`）に置き換えるかを決める |
-| demo-app の置き場所 | このリポジトリの `demo-app/`（別の Hono のアプリ、ポート 4000、DB なし） | 段5で独立させるまでの仮住まい |
+| demo-app の RP の実装 | ステップ4では、検証を自分で書く（Discovery、JWKS、署名、iss・aud・exp・nonce） | RP が何を確かめるかを見るため。ステップ5で独立したリポジトリ（ひな形）にするとき、ライブラリ（`openid-client`）に置き換えるかを決める |
+| demo-app の置き場所 | このリポジトリの `demo-app/`（別の Hono のアプリ、ポート 4000、DB なし） | ステップ5で独立させるまでの仮住まい |
 | 同意画面 | 作る。記録して、2回目からは出さない | 自分のアプリ同士なら省けるが、学ぶために作る |
 
 ### テーブル
@@ -286,7 +286,7 @@ sequenceDiagram
 | `oauth_clients` | `id`（client_id）、`secret_hash`（client_secret の SHA-256）、`name`（同意画面に出す名前）、`redirect_uris`（登録した URL。完全一致で照らす）、`created_at` |
 | `authorization_codes` | `code_hash`（SHA-256）、`client_id`、`user_id`、`redirect_uri`、`scope`、`code_challenge`、`nonce`、`amr`、`auth_time`、`expires_at`（60秒） |
 | `oauth_consents` | `user_id`、`client_id`、`scope`、`created_at` |
-| `access_tokens` | `token_hash`（SHA-256）、`client_id`、`user_id`、`scope`、`expires_at`（段4。段5で見直す） |
+| `access_tokens` | `token_hash`（SHA-256）、`client_id`、`user_id`、`scope`、`expires_at`（ステップ4。ステップ5で見直す） |
 
 - client_secret はセッション ID と同じく十分長い乱数なので、遅いハッシュ（Argon2id）は要らない。SHA-256 で足りる。
 - `auth_time` は、利用者が auth で実際にログインした時刻（セッションを作った時刻）。SSO で2回目に来たときは、新しいログインではないので、最初の時刻のまま入る。

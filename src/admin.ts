@@ -63,7 +63,7 @@ async function unlockUser(username: string) {
 	console.log(`unlocked user "${username}"`);
 }
 
-// パスワードを設定し直す。パスキーだけの利用者が端末を全部なくしたときの回復の手段（段3-c）。
+// パスワードを設定し直す。パスキーだけの利用者が端末を全部なくしたときの回復の手段（ステップ3-c）。
 // 設定したパスワードは、利用者に別の経路（対面など）で渡す。ログインしたら、新しいパスキーを登録してもらう
 async function setPassword(username: string) {
 	const password = await readNewPassword();
@@ -75,7 +75,7 @@ async function setPassword(username: string) {
 	console.log(`set password for "${username}"`);
 }
 
-// RP（client）を登録する（段4）。client_secret はここで一度だけ表示する。DB には SHA-256 だけを置くので、なくしたら登録し直す
+// RP（client）を登録する（ステップ4）。client_secret はここで一度だけ表示する。DB には SHA-256 だけを置くので、なくしたら登録し直す
 //   例：admin create-client demo-app http://localhost:4000/callback "デモのアプリ"
 async function createClient(id: string, redirectUri: string, name: string) {
 	const url = new URL(redirectUri); // 形が URL でなければ、ここで止まる

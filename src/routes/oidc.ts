@@ -142,7 +142,7 @@ oidc.get('/authorize', async (c) => {
 	const { req } = checked;
 
 	// ログイン 4 のあとの 2つ目の Note：auth にログインしていなければ、ログイン画面へ寄り道する。
-	// 戻り先（この /authorize の URL そのもの）を Cookie に覚え、ログインが済んだら戻ってくる（段1〜3のどの方法でも）
+	// 戻り先（この /authorize の URL そのもの）を Cookie に覚え、ログインが済んだら戻ってくる（ステップ1〜3のどの方法でも）
 	const user = await currentUser(c);
 	if (!user) {
 		const url = new URL(c.req.url);
@@ -269,7 +269,7 @@ oidc.post('/token', async (c) => {
 		...(scopes.includes('profile') ? { preferred_username: user.username } : {}),
 	});
 
-	// アクセストークン（/userinfo を呼ぶ許可証）。段4は乱数を DB で引く形
+	// アクセストークン（/userinfo を呼ぶ許可証）。ステップ4は乱数を DB で引く形
 	const accessToken = randomBytes(32).toString('base64url');
 	await db.delete(accessTokens).where(lt(accessTokens.expiresAt, new Date()));
 	await db.insert(accessTokens).values({

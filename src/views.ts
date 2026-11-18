@@ -135,7 +135,7 @@ export const totpSetupPage = (qrDataUrl: string, secretBase32: string, error?: s
     </form>`,
 	);
 
-// ---- OIDC（段4） ----
+// ---- OIDC（ステップ4） ----
 
 // scope を、利用者に見せる言葉にする
 const scopeLabel: Record<string, string> = {

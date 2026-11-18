@@ -132,7 +132,7 @@ passkey.post('/login/passkey/verify', async (c) => {
 	}
 
 	// ログイン 9：カウンタと最後に使った時刻を更新し、本物のセッションを始める。
-	// パスワードの失敗による一時停止（段1-c）は見ない：あれはパスワードの総当たりを遅くするためで、パスキーは総当たりできない
+	// パスワードの失敗による一時停止（ステップ1-c）は見ない：あれはパスワードの総当たりを遅くするためで、パスキーは総当たりできない
 	await db
 		.update(webauthnCredentials)
 		.set({ signCount: result.signCount, lastUsedAt: new Date() })

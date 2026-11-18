@@ -58,7 +58,7 @@
         &lt;mxCell id=&quot;lg_lt3&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;認証器とブラウザ&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;783.0999999999999&quot; y=&quot;699&quot; width=&quot;112.0&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
         &lt;mxCell id=&quot;lg_l4&quot; value=&quot;&quot; style=&quot;endArrow=block;endFill=1;endSize=5;html=1;strokeColor=#9E9E9E;strokeWidth=1.5;dashed=1;dashPattern=2 3;&quot; edge=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;&lt;mxPoint x=&quot;917.0999999999999&quot; y=&quot;709&quot; as=&quot;sourcePoint&quot;/&gt;&lt;mxPoint x=&quot;957.0999999999999&quot; y=&quot;709&quot; as=&quot;targetPoint&quot;/&gt;&lt;/mxGeometry&gt;&lt;/mxCell&gt;
         &lt;mxCell id=&quot;lg_lt4&quot; value=&quot;&amp;lt;font color=&amp;quot;#424242&amp;quot;&amp;gt;通信ではない（人が読み写す）&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11.5;fontColor=#424242;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;965.0999999999999&quot; y=&quot;699&quot; width=&quot;181.0&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
-        &lt;mxCell id=&quot;lg_note&quot; value=&quot;&amp;lt;font color=&amp;quot;#757575&amp;quot;&amp;gt;リダイレクト（demo-app → auth → demo-app）はブラウザを経由する。順序は各段のシーケンス図で&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=right;fontSize=10.5;fontColor=#757575;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;1054&quot; y=&quot;727&quot; width=&quot;400&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lg_note&quot; value=&quot;&amp;lt;font color=&amp;quot;#757575&amp;quot;&amp;gt;リダイレクト（demo-app → auth → demo-app）はブラウザを経由する。順序は各ステップのシーケンス図で&amp;lt;/font&amp;gt;&quot; style=&quot;text;html=1;align=right;fontSize=10.5;fontColor=#757575;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;1054&quot; y=&quot;727&quot; width=&quot;400&quot; height=&quot;20&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;
       &lt;/root&gt;
     &lt;/mxGraphModel&gt;
   &lt;/diagram&gt;
@@ -215,5 +215,5 @@
 <text x="785.0999999999999" y="713" font-size="11.5" fill="#424242">認証器とブラウザ</text>
 <line x1="917.0999999999999" y1="709" x2="957.0999999999999" y2="709" stroke="#9E9E9E" stroke-width="1.5" stroke-dasharray="2 3" marker-end="url(#arrow-human)"/>
 <text x="967.0999999999999" y="713" font-size="11.5" fill="#424242">通信ではない（人が読み写す）</text>
-<text x="1454" y="740" text-anchor="end" font-size="10.5" fill="#757575">リダイレクト（demo-app → auth → demo-app）はブラウザを経由する。順序は各段のシーケンス図で</text>
+<text x="1454" y="740" text-anchor="end" font-size="10.5" fill="#757575">リダイレクト（demo-app → auth → demo-app）はブラウザを経由する。順序は各ステップのシーケンス図で</text>
 </svg>

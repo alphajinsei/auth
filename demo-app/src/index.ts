@@ -1,5 +1,5 @@
 // demo-app：auth でログインする、小さな RP。流れ：docs/steps/4-oidc.md の図「ログイン」の 1〜3、10〜14
-// 段5で独立したリポジトリにするまでの仮住まい。DB は持たない（セッションはメモリに置き、再起動で消える）
+// ステップ5で独立したリポジトリにするまでの仮住まい。DB は持たない（セッションはメモリに置き、再起動で消える）
 import { randomBytes } from 'node:crypto';
 import { serve } from '@hono/node-server';
 import { Hono, type Context } from 'hono';
