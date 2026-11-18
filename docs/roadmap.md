@@ -70,16 +70,22 @@
 - [x] リフレッシュトークンの取り替えと失効（5-b、5-c。demo-app から使うのは 5-d）
 - [x] demo-app がトークンを持ち、期限切れでリフレッシュ、ログアウトで取り消す（5-d）
 - [x] 本番に載せ、手元の demo-app から本番の auth で試す（5-e）
-- [ ] 認可モデル（E）を小さく：auth がロールを渡し、demo-app がそれを見て、してよい操作を判断する
 
 ステップ5までで、自分のサービスのログインをまとめるには足りる。OIDC の OP として足りていないもの（RS256、`prompt`、ログアウトの連携、鍵の入れ替えなど）は [設計の「OIDC の OP として、足りていないもの」](design.md#oidc-の-op-として足りていないもの)。
 
-## ステップ6：auth を呼ぶ側のひな形（最後のステップ）
+## ステップ6：auth を呼ぶ側のひな形
 
 - [x] demo-app をコンテナにし、独立したリポジトリ [sample-auth-client](https://github.com/alphajinsei/sample-auth-client)（Template repository）として共通基盤に載せる。盗難のまねは持っていかない（学ぶための機能なので、auth の demo-app に残す）
 - [x] 本番に載せる：`./tf.sh apply`、`npm run db:init`、`npm run register-client`（client_secret は Vault から auth へ流し込み、手元を通さない）、`npm run deploy`
 
-## ステップ7：LDAP（F。やらない）
+## ステップ7：認可（E。アクセス制御を、モジュールとして小さく作る）
+
+- [x] 来歴：[アクセス制御（認可）](notes/extra-history-authorization.md)（アクセス行列、ACL と DAC、MAC、RBAC、ABAC と PEP・PDP、ReBAC と Zanzibar）
+- [ ] シーケンス図と決めること：PEP（アプリの API）と PDP（判断のモジュール）の分け方、どこに置くか
+- [ ] PDP を作る：関係のタプルを持ち、「Check（主体, 関係, 対象）」に答える
+- [ ] アプリから使う：持ち主だけ・共有した相手・管理者（auth が渡すロール。RBAC を関係の1つとして表す）
+
+## ステップ8：LDAP（F。やらない）
 
 2026-11-19：やらないことにした（関心が薄れたため）。項目は記録として残す。
 
