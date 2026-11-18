@@ -88,6 +88,26 @@ ID・パスワードだけ、ID・パスワード + TOTP、パスキー、を自
 - クライアントは管理用のコマンドで登録する（動的な登録は作らない）。`redirect_uri` は完全一致で比べる。
 - Discovery（`/.well-known/openid-configuration`）と JWKS（`/jwks.json`）を公開する。
 
+### OIDC の OP として、足りていないもの
+
+ステップ4・5で作ったもの（認可コード + PKCE、同意、ID トークン、Discovery、JWKS、`/userinfo`、JWT のアクセストークン、リフレッシュトークンの取り替えと盗難の検知、`/revoke`）で、**自分のサービスのログインを1か所にまとめる**には足りる。ただし、OIDC の OP として仕様どおりに名乗るには足りないものがあり、製品並みにするなら、さらに拡張がある。分かっていて作っていないもの：
+
+| 段 | 項目 | 今の auth |
+| --- | --- | --- |
+| 仕様が全 OP に求める（OIDC Core 15.1） | ID トークンの RS256 での署名 | ES256 だけ |
+| | `prompt`（`none`、`login`、`consent`）、`max_age` | 受け取らない（auth_time は入れている） |
+| | `display`、`ui_locales`、`acr_values` | 受け取らない（多くは「できる範囲で従う」でよい） |
+| 運用で欲しくなる | ログアウトの連携（RP-Initiated Logout、Back-Channel Logout） | demo-app からログアウトしても、auth のセッションは残る |
+| | 署名の鍵の入れ替え（JWKS に新旧を並べる） | 鍵は1つ。作り直すと、出した ID トークンが検証できなくなる |
+| | 同意の管理画面、client の管理（secret の作り直し、redirect_uri の追加） | 管理用のコマンドで登録するだけ |
+| | public client（secret を持てない SPA、スマホのアプリ） | confidential client（client_secret あり）だけ |
+| | `/token` の回数の制限、盗難の検知の通知 | 監査ログに出すだけ |
+| 用途によって足す | client_credentials、デバイスの流れ（RFC 8628）、Introspection（RFC 7662）、動的な登録（RFC 7591）、PAR（RFC 9126）、DPoP（RFC 9449）・mTLS、ペアワイズの sub | 作らない |
+
+- どこまで仕様に合っているかは、OpenID Foundation の適合性のテスト（conformance suite。たとえば「Basic OP」）で確かめられる。上の表の1段目が、そのまま失敗として出るはず。
+- 足すなら、実用の面ではログアウトの連携と鍵の入れ替えが先（「6. 今後の発展」）。
+- 経緯：[勉強メモ](notes/study-notes.md) の「OAuth・OIDC のサーバーを実装するといった場合、ステップ4・ステップ5の内容を網羅して完成か」。
+
 ### 前段の構成で気をつけること
 
 - 通信は Cloudflare → OCI LB（ここで TLS が終わる）→ app VM。アプリには HTTP で届く。issuer や Cookie の `Secure` の判断に、リクエストの URL を使わない。issuer は環境変数（`ISSUER=https://auth.alphajinsei.com`）で固定する。
@@ -107,6 +127,7 @@ auth を、自分が管理するサービス全体の認証基盤にしていく
 - アカウントの回復の経路（予備のコード、別の認証器、メール）
 - 管理の画面（利用者・クライアントの一覧、無効化）
 - ログアウトの連携（OP のセッションを切ったら、RP も切る）
+- 署名の鍵の入れ替え、`prompt`・`max_age` など、OIDC の OP として足りていないもの（「4. 決めたこと」の「OIDC の OP として、足りていないもの」）
 
 ## 7. 検討の経緯
 
