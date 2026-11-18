@@ -27,20 +27,21 @@ export const jwks = {
 
 const b64json = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
 
-// ログイン 12 のあとの 2つ目の Note：JWT を作って署名する（要素⑧）
-export function signJwt(payload: Record<string, unknown>): string {
-	const signingInput = `${b64json({ alg: 'ES256', typ: 'JWT', kid })}.${b64json(payload)}`;
+// ログイン 12 のあとの 2つ目の Note：JWT を作って署名する（要素⑧）。
+// typ：何の JWT か。ID トークンは 'JWT'、アクセストークンは 'at+jwt'（RFC 9068。ステップ5の要素②。取り違えさせないため）
+export function signJwt(payload: Record<string, unknown>, typ = 'JWT'): string {
+	const signingInput = `${b64json({ alg: 'ES256', typ, kid })}.${b64json(payload)}`;
 	// ieee-p1363：署名を r と s を32バイトずつ並べた64バイトにする（JWS の ES256 の決まり、RFC 7518）。
 	// Node.js の既定は DER（ASN.1）で、ステップ3の WebAuthn の署名はそちらだった。同じ ES256 でも、入れ物の形が違う
 	const signature = sign('sha256', Buffer.from(signingInput), { key: privateKey, dsaEncoding: 'ieee-p1363' });
 	return `${signingInput}.${signature.toString('base64url')}`;
 }
 
-// 署名を確かめて、中身を返す（テスト用。demo-app は自分で同じことを書く）
+// 署名を確かめて、中身を返す（テストと、アクセストークンの検証 src/access-token.ts で使う。demo-app は自分で同じことを書く）
 export function verifyJwt(token: string, key: KeyObject = createPublicKey(privateKey)): Record<string, unknown> {
 	const [h, p, s] = token.split('.');
 	const header = JSON.parse(Buffer.from(h, 'base64url').toString('utf8'));
-	if (header.alg !== 'ES256') throw new Error(`unexpected alg ${header.alg}`); // alg を相手の言い値にしない
+	if (header.alg !== 'ES256') throw new Error('unexpected alg'); // alg を相手の言い値にしない。値は文面に混ぜない（/userinfo が WWW-Authenticate に入れる）
 	const ok = verify('sha256', Buffer.from(`${h}.${p}`), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(s, 'base64url'));
 	if (!ok) throw new Error('bad signature');
 	return JSON.parse(Buffer.from(p, 'base64url').toString('utf8'));

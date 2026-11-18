@@ -1,11 +1,13 @@
 // OIDC の OP（auth）として公開する URL。流れ：docs/steps/4-oidc.md
 // 番号の読み方は src/webauthn.ts と同じ（「ログイン 4」＝ 4-oidc.md の図「ログイン」の 4 番の矢印、「要素②」＝「1. 技術の要素」の ②）
 // 4-a：Discovery と JWKS（図「準備」）。4-b：/authorize（図「ログイン」の 4〜9）。4-c：/token（ログイン 11〜12）、/userinfo（図「/userinfo」）
+// ステップ5（docs/steps/5-tokens.md）：5-a でアクセストークンを JWT にし、/userinfo は図「API を呼ぶ」の形で確かめる
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { and, eq, lt } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { db } from '../db/client.js';
-import { accessTokens, authorizationCodes, oauthClients, oauthConsents, users } from '../db/schema.js';
+import { ACCESS_TOKEN_TTL_S, issueAccessToken, verifyAccessToken } from '../access-token.js';
+import { authorizationCodes, oauthClients, oauthConsents, users } from '../db/schema.js';
 import { jwks, signJwt } from '../jwt.js';
 import { currentUser, rememberReturnTo } from '../session.js';
 import { authorizeErrorPage, consentPage } from '../views.js';
@@ -185,7 +187,6 @@ oidc.post('/authorize', async (c) => {
 // ---- /token（図「ログイン」の 11〜12）。demo-app のサーバーから、裏の通信で呼ばれる ----
 
 const ID_TOKEN_TTL_S = 10 * 60; // ID トークンは受け取った直後に確かめて使い終わるので、短くてよい
-const ACCESS_TOKEN_TTL_S = 60 * 60;
 
 // /token のエラー。形は OAuth 2.0 の決まり（RFC 6749 5.2）：JSON で { error, error_description }
 function tokenError(c: Context, error: string, description: string, status: 400 | 401 = 400) {
@@ -269,16 +270,9 @@ oidc.post('/token', async (c) => {
 		...(scopes.includes('profile') ? { preferred_username: user.username } : {}),
 	});
 
-	// アクセストークン（/userinfo を呼ぶ許可証）。ステップ4は乱数を DB で引く形
-	const accessToken = randomBytes(32).toString('base64url');
-	await db.delete(accessTokens).where(lt(accessTokens.expiresAt, new Date()));
-	await db.insert(accessTokens).values({
-		tokenHash: sha256hex(accessToken),
-		clientId: client.id,
-		userId: row.userId,
-		scope: row.scope,
-		expiresAt: new Date((now + ACCESS_TOKEN_TTL_S) * 1000),
-	});
+	// アクセストークン（/userinfo を呼ぶ許可証）。ステップ4は乱数を DB で引く形だった。
+	// ステップ5の要素②：JWT にして、DB には置かない（/userinfo は署名と中身だけで確かめる）
+	const accessToken = issueAccessToken({ issuer, sub: row.userId, clientId: client.id, scope: row.scope }, now);
 
 	audit('token_issued', { clientId: client.id, userId: row.userId });
 	// ログイン 13：返事の形は OAuth 2.0（access_token、token_type、expires_in）に、OIDC が id_token を足したもの
@@ -291,29 +285,35 @@ oidc.post('/token', async (c) => {
 	});
 });
 
-// ---- /userinfo（図「/userinfo」）。アクセストークンを見せれば、利用者の情報を返す ----
+// ---- /userinfo（図「API を呼ぶ」。docs/steps/5-tokens.md）。アクセストークンを見せれば、利用者の情報を返す ----
+// auth の中にあるが、ここでは「認可サーバーとは別の API」として振る舞う：トークンの確認に、auth の DB を使わない
 // 「Bearer」＝持参人。トークンを持っている人なら誰でも使える（盗まれたら使われる。だから短命で、TLS の上だけで送る）
 
-function bearerError(c: Context, description: string) {
-	// RFC 6750 3.1：トークンが不正なときは 401 と、WWW-Authenticate で理由を返す
-	c.header('WWW-Authenticate', `Bearer error="invalid_token", error_description="${description}"`);
-	return c.json({ error: 'invalid_token', error_description: description }, 401);
+// RFC 6750 3.1：トークンが不正なら 401 invalid_token、scope が足りなければ 403 insufficient_scope。どちらも WWW-Authenticate で理由を返す
+function bearerError(c: Context, error: 'invalid_token' | 'insufficient_scope', description: string) {
+	c.header('WWW-Authenticate', `Bearer error="${error}", error_description="${description}"`);
+	return c.json({ error, error_description: description }, error === 'invalid_token' ? 401 : 403);
 }
 
+// API 1：GET /userinfo（Authorization: Bearer アクセストークン）
 oidc.get('/userinfo', async (c) => {
 	const header = c.req.header('authorization') ?? '';
-	if (!header.startsWith('Bearer ')) return bearerError(c, 'missing bearer token');
-	// /userinfo 1 → 2：トークンの SHA-256 から、利用者と scope を引く
-	const [row] = await db
-		.select({ userId: accessTokens.userId, scope: accessTokens.scope, expiresAt: accessTokens.expiresAt, username: users.username })
-		.from(accessTokens)
-		.innerJoin(users, eq(users.id, accessTokens.userId))
-		.where(eq(accessTokens.tokenHash, sha256hex(header.slice(7))));
-	// /userinfo 2 のあとの Note：期限内か。scope に openid があるか
-	if (!row || row.expiresAt < new Date()) return bearerError(c, 'unknown or expired token');
-	const scopes = row.scope.split(' ');
-	if (!scopes.includes('openid')) return c.json({ error: 'insufficient_scope' }, 403);
+	if (!header.startsWith('Bearer ')) return bearerError(c, 'invalid_token', 'missing bearer token');
 
-	// /userinfo 3：sub は ID トークンと同じ値。RP は「ID トークンの sub と一致するか」を確かめる決まり（OIDC Core 5.3.2）
-	return c.json({ sub: row.userId, ...(scopes.includes('profile') ? { preferred_username: row.username } : {}) });
+	// API 1 のあとの 2つの Note：署名、typ、iss、aud、exp を手元で確かめる（要素③）。トークンの表は引かない
+	let claims;
+	try {
+		claims = verifyAccessToken(header.slice(7), issuer);
+	} catch (e) {
+		return bearerError(c, 'invalid_token', (e as Error).message);
+	}
+	const scopes = claims.scope.split(' ');
+	if (!scopes.includes('openid')) return bearerError(c, 'insufficient_scope', 'openid scope required');
+
+	// API 2：ユーザー名は、トークンに書いた値ではなく今の値を返したいので、ここは DB を引く（トークンを確かめるためではない）
+	const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, claims.sub));
+	if (!user) return bearerError(c, 'invalid_token', 'user no longer exists');
+
+	// API 3：sub は ID トークンと同じ値。RP は「ID トークンの sub と一致するか」を確かめる決まり（OIDC Core 5.3.2）
+	return c.json({ sub: claims.sub, ...(scopes.includes('profile') ? { preferred_username: user.username } : {}) });
 });

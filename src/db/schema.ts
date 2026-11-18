@@ -118,15 +118,4 @@ export const oauthConsents = mysqlTable(
 	(t) => [primaryKey({ columns: [t.userId, t.clientId] })],
 );
 
-// アクセストークン（/userinfo を呼ぶ許可証）。ステップ4は「DB で引く乱数」（セッション ID と同じ形）。ステップ5で JWT と比べる
-export const accessTokens = mysqlTable('access_tokens', {
-	tokenHash: varchar('token_hash', { length: 64 }).primaryKey(), // トークンの SHA-256。トークンそのものは置かない
-	clientId: varchar('client_id', { length: 64 })
-		.notNull()
-		.references(() => oauthClients.id, { onDelete: 'cascade' }),
-	userId: varchar('user_id', { length: 36 })
-		.notNull()
-		.references(() => users.id, { onDelete: 'cascade' }),
-	scope: varchar('scope', { length: 255 }).notNull(),
-	expiresAt: datetime('expires_at').notNull(),
-});
+// アクセストークンの表（access_tokens）は、ステップ5で消した。アクセストークンは JWT になり、DB に置かない（docs/steps/5-tokens.md）

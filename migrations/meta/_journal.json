@@ -50,6 +50,13 @@
       "when": 1794754125231,
       "tag": "0006_access_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1795005343979,
+      "tag": "0007_drop_access_tokens",
+      "breakpoints": true
     }
   ]
 }

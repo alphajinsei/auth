@@ -121,7 +121,20 @@ sequenceDiagram
   A-->>R: sub、preferred_username
 ```
 
-ステップ4の図「/userinfo」との違いは、2 のあとの2つの Note（DB を引かずに確かめる）と、3 で引くのが `users` だけになったこと。
+ステップ4の図「/userinfo」との違いは、1 のあとの2つの Note（DB を引かずに確かめる）と、2 で引くのが `users` だけになったこと。
+
+#### 図「API を呼ぶ」とコードの対応
+
+| 手順 | 図の中身 | コード |
+| --- | --- | --- |
+| API 1 | GET /userinfo（Bearer） | [src/routes/oidc.ts](../../src/routes/oidc.ts) の `GET /userinfo`。`Authorization: Bearer` がなければ 401 `invalid_token` |
+| API 1 のあとの 1つ目の Note | typ、kid、署名 | [src/access-token.ts](../../src/access-token.ts) の `verifyAccessToken`。typ が `at+jwt` でなければ断る（ID トークンの持ち込み）。署名は [src/jwt.ts](../../src/jwt.ts) の `verifyJwt`（alg が ES256 かも見る） |
+| API 1 のあとの 2つ目の Note | iss、aud、exp、scope | 同じ関数で iss・aud（どちらも auth の issuer）・exp。外れたら 401 `invalid_token`。scope に openid がなければ、`/userinfo` が 403 `insufficient_scope` |
+| API 2 | users を引く | `users` を sub で引く（ユーザー名の今の値）。利用者が消えていたら 401 |
+| API 3 | sub、preferred_username | `c.json({ sub, preferred_username })`。preferred_username は scope に profile があるときだけ |
+
+- アクセストークンは [src/access-token.ts](../../src/access-token.ts) の `issueAccessToken` が作る（`/token` から呼ぶ）。中身は iss、sub、aud、client_id、scope、iat、exp（5分）、jti。ヘッダーは `typ: at+jwt`。
+- エラーの文面は `WWW-Authenticate` にそのまま入るので、相手が送った値（typ、alg など）を文面に混ぜない。混ぜると、引用符や制御文字でヘッダーが壊れる（試したら 500 になった）。
 
 ### 期限切れとリフレッシュ
 
