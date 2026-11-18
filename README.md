@@ -3,7 +3,7 @@
 既製品を使わずに自作する、認証・認可のサーバー（IdP）。パスワード、TOTP、パスキー（WebAuthn）でログインでき、OIDC と OAuth 2.0（認可コード + PKCE）でほかのアプリにログインの結果と権限を渡す。OCI の共通基盤（方式③）の Docker ホストに載る。
 
 - 公開先：https://auth.alphajinsei.com
-- 設計：[docs/design.md](docs/design.md)、進め方と進捗：[docs/roadmap.md](docs/roadmap.md)、勉強メモ：[docs/notes/](docs/notes/)
+- 設計：[docs/design.md](docs/design.md)、進め方と進捗：[docs/roadmap.md](docs/roadmap.md)、ステップごとの設計（シーケンス図）：[docs/steps/](docs/steps/)、来歴の記事：[docs/history/](docs/history/)、勉強メモと番外編：[docs/notes/](docs/notes/)
 - 載せている共通基盤：[oci-platform](https://github.com/alphajinsei/oci-platform)。仕様（アプリが受け取るもの・守ること）、運用、困ったときは [その README](https://github.com/alphajinsei/oci-platform#readme)
 - テンプレートにしたサンプル：[sample-oci-vm-docker](https://github.com/alphajinsei/sample-oci-vm-docker)
 

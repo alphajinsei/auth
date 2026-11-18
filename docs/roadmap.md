@@ -8,7 +8,7 @@
 
 - コードとデプロイは Claude が行う。ユーザーは、シーケンス図とコードを読んで理解する側。
 - 各ステップは「来歴の記事 → シーケンス図 → 実装」の順に進める。
-  - 来歴の記事（`notes/extra-history-*.md`）：その技術がどういう思想に基づき、どんな不満を解消し、なぜ普及したか。発見的な経緯と、整理された今の形の両方を見る。
+  - 来歴の記事（`history/<番号>-<技術>.md`）：その技術がどういう思想に基づき、どんな不満を解消し、なぜ普及したか。発見的な経緯と、整理された今の形の両方を見る。
   - シーケンス図（`steps/<ステップ>-*.md`）：流れを理解し、その図の矢印1本1本に対応する処理を実装する。
 - 一度に読む量を少なくする。小さく足しては説明し、理解してから次へ進む。どのくらいの粒度にするかは、進めながら調整する。
 - 分かったことは [勉強メモ](notes/study-notes.md) に短く、長い解説は番外編（`notes/extra-*.md`）に書く。
@@ -27,7 +27,7 @@
 
 ## ステップ1：パスワードでのログインとセッション（A・B）
 
-- [x] 来歴：[パスワードとセッション](notes/extra-history-password-session.md)
+- [x] 来歴：[パスワードとセッション](history/1-password-session.md)
 - [x] シーケンス図：[ログイン、以後のリクエスト、ログアウト](steps/1-password-session.md)
 - [x] 1-a：メモの API を取り除き、利用者とセッションのテーブルを作る。管理用のコマンドで利用者を作る（Argon2id）
 - [x] 1-b：ログイン画面、セッションの Cookie、ログアウト
@@ -36,7 +36,7 @@
 
 ## ステップ2：TOTP（A）
 
-- [x] 来歴：[ワンタイムパスワード](notes/extra-history-otp.md)（Lamport の鎖、SecurID、HOTP・TOTP、Google Authenticator、SMS の衰退）
+- [x] 来歴：[ワンタイムパスワード](history/2-otp.md)（Lamport の鎖、SecurID、HOTP・TOTP、Google Authenticator、SMS の衰退）
 - [x] シーケンス図：[登録（QR）とログイン時の確認](steps/2-totp.md)
 - [x] 秘密の保存のしかたを決める：暗号化して DB に。鍵は Vault → デプロイで環境変数
 - [x] 2-a：6桁を作る計算と照合（RFC 6238 のテスト値で確かめる）
@@ -47,7 +47,7 @@
 
 ## ステップ3：パスキー（A）
 
-- [x] 来歴：[FIDO2 とパスキー](notes/extra-history-fido.md)（前史の公開鍵の認証、U2F、WebAuthn、同期されるパスキー）
+- [x] 来歴：[FIDO2 とパスキー](history/3-fido.md)（前史の公開鍵の認証、U2F、WebAuthn、同期されるパスキー）
 - [x] シーケンス図：[登録とログイン（認証器・ブラウザ・auth）](steps/3-passkey.md)
 - [x] 3-a：登録（options、ブラウザの JavaScript、検証、保存。アカウントの画面に一覧）
 - [x] 3-b：ログイン（options、署名の検証、セッション。ログイン画面に「パスキーでログイン」）
@@ -55,7 +55,7 @@
 
 ## ステップ4：OIDC（C・D）
 
-- [x] 来歴：[OAuth 2.0 と OpenID Connect](notes/extra-history-oauth-oidc.md)（パスワードを渡していた時代、SAML、OpenID 2.0、OAuth 1.0 から）、JWT
+- [x] 来歴：[OAuth 2.0 と OpenID Connect](history/4-oauth-oidc.md)（パスワードを渡していた時代、SAML、OpenID 2.0、OAuth 1.0 から）、JWT
 - [x] シーケンス図：[認可コード + PKCE、Discovery と JWKS、SSO、/userinfo](steps/4-oidc.md)
 - [x] 署名鍵、JWKS、Discovery（4-a。本番の鍵は `./tf.sh apply` のあと）
 - [x] `/authorize`、同意画面（4-b）、`/token`、`/userinfo`（4-c）
@@ -64,7 +64,7 @@
 
 ## ステップ5：アクセストークンとリフレッシュトークン（D）
 
-- [x] 来歴：[アクセストークンとリフレッシュトークン](notes/extra-history-tokens.md)（OAuth 1.0 の長生きのトークン、WRAP の2本立て、JWT、取り替え、DPoP）
+- [x] 来歴：[アクセストークンとリフレッシュトークン](history/5-tokens.md)（OAuth 1.0 の長生きのトークン、WRAP の2本立て、JWT、取り替え、DPoP）
 - [x] シーケンス図：[ステップ5の設計](steps/5-tokens.md)（API を呼ぶ、期限切れとリフレッシュ、盗難の検知、ログアウトと取り消し）
 - [x] `/userinfo` がアクセストークン（JWT）と scope を検証する（5-a）
 - [x] リフレッシュトークンの取り替えと失効（5-b、5-c。demo-app から使うのは 5-d）
@@ -80,7 +80,7 @@
 
 ## ステップ7：認可（E。アクセス制御を、モジュールとして小さく作る）
 
-- [x] 来歴：[アクセス制御（認可）](notes/extra-history-authorization.md)（アクセス行列、ACL と DAC、MAC、RBAC、ABAC と PEP・PDP、ReBAC と Zanzibar）
+- [x] 来歴：[アクセス制御（認可）](history/7-authorization.md)（アクセス行列、ACL と DAC、MAC、RBAC、ABAC と PEP・PDP、ReBAC と Zanzibar）
 - [ ] シーケンス図と決めること：PEP（アプリの API）と PDP（判断のモジュール）の分け方、どこに置くか
 - [ ] PDP を作る：関係のタプルを持ち、「Check（主体, 関係, 対象）」に答える
 - [ ] アプリから使う：持ち主だけ・共有した相手・管理者（auth が渡すロール。RBAC を関係の1つとして表す）

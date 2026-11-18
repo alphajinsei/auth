@@ -2,7 +2,7 @@
 
 最終更新：2026-11-15
 
-背景は [番外編：OAuth 2.0 と OpenID Connect の来歴](../notes/extra-history-oauth-oidc.md)、用語は [番外編：OAuth・OIDC の用語](../notes/extra-auth-terms.md)。demo-app の「auth でログイン」を押すと auth に移り、ステップ1〜3のどれかでログインし、demo-app に戻ってくると、demo-app が「誰がログインしたか」を知っている、までを作る。
+背景は [番外編：OAuth 2.0 と OpenID Connect の来歴](../history/4-oauth-oidc.md)、用語は [番外編：OAuth・OIDC の用語](../notes/extra-auth-terms.md)。demo-app の「auth でログイン」を押すと auth に移り、ステップ1〜3のどれかでログインし、demo-app に戻ってくると、demo-app が「誰がログインしたか」を知っている、までを作る。
 
 ## この文書の読み方
 

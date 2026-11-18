@@ -1,5 +1,5 @@
 // TOTP（RFC 6238）と、その元になる HOTP（RFC 4226）。計算はここで自分で書き、HMAC そのものだけ node:crypto に任せる。
-// 背景：docs/notes/extra-history-otp.md、流れ：docs/steps/2-totp.md
+// 背景：docs/history/2-otp.md、流れ：docs/steps/2-totp.md
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const STEP_SECONDS = 30; // 時刻を30秒ごとの枠に区切る
