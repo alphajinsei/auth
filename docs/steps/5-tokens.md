@@ -168,6 +168,22 @@ sequenceDiagram
 - リフレッシュの返事に、ID トークンは入れない（OIDC Core 12.2 では入れてもよい）。demo-app が「誰か」を知るのはログインのときだけで十分なので。
 - 4 のあとの Note か 5 のどれかが外れたら `invalid_grant`。demo-app は自分のセッションを消して、ログインし直してもらう。
 
+#### 図「期限切れとリフレッシュ」とコードの対応
+
+| 手順 | 図の中身 | コード（[src/routes/oidc.ts](../../src/routes/oidc.ts)） |
+| --- | --- | --- |
+| リフレッシュ 1〜2 | 期限切れで 401 | `GET /userinfo`（図「API を呼ぶ」と同じ）。`verifyAccessToken` が `expired` を投げる |
+| リフレッシュ 3 | POST /token（grant_type=refresh_token） | `POST /token` が grant_type で分かれ、`refreshGrant` へ。client の認証はログインのときと同じ `authenticateClient` |
+| リフレッシュ 4 | 行を引く | `refresh_tokens` を SHA-256 で引く。その前に、系統の期限が切れた行を掃除する |
+| リフレッシュ 4 のあとの Note | client、使用済み、期限 | 知らない → `unknown refresh token`、別の client → `issued to another client`、使用済み → 図「盗難の検知」へ、1本の期限切れ → `expired`。どれも `invalid_grant` |
+| リフレッシュ 5 | 利用者と同意 | `users` と `oauth_consents` を引く。なければ系統ごと消して `invalid_grant` |
+| リフレッシュ 6 | 使用済みにし、新しい行を足す | `used_at` が空のときだけ書き換える（`affectedRows` が 1 でなければ、同時に来たもう1つが先に使った → 盗難と同じ扱い）。`issueRefreshToken` で同じ系統に足す。1本の期限は「今から14日」と系統の期限の早いほう |
+| リフレッシュ 6 のあとの Note | 新しいアクセストークン | `issueAccessToken`（5-a） |
+| リフレッシュ 7 | 新しい2つ | `{ access_token, token_type, expires_in, scope, refresh_token }`。ID トークンは入れない |
+| リフレッシュ 8〜9 | もう一度 /userinfo | demo-app の側（5-d） |
+
+ログインのとき（図「ログイン」の 13、[ステップ4](4-oidc.md)）も、返事に `refresh_token` が加わった。`codeGrant` が新しい系統を始める（`family_id` は乱数、系統の期限は30日後）。
+
 ### 盗難の検知
 
 攻撃者が、何かの方法でリフレッシュトークン RT1 と client_secret を手に入れたとする（client_secret がなければ、そもそも使えない。要素④）。
@@ -195,6 +211,30 @@ sequenceDiagram
 ```
 
 順番が逆（攻撃者が先に RT1 を使い、demo-app があとで RT1 を使う）でも、あとから来た方が「使用済み」を出すので、同じように系統が消える。どちらが盗んだ側かは auth には分からないので、両方を締め出す。正しい利用者はログインし直せばよく、攻撃者はログインできない。
+
+#### 図「盗難の検知」とコードの対応
+
+| 手順 | 図の中身 | コード（[src/routes/oidc.ts](../../src/routes/oidc.ts)） |
+| --- | --- | --- |
+| 盗難 1〜3 | 正しい持ち主のリフレッシュ | 図「期限切れとリフレッシュ」の 3〜7 と同じ |
+| 盗難 4〜5 | 攻撃者が RT1 を出し、行を引く | 同じ `refreshGrant` |
+| 盗難 5 のあとの Note | 使用済み | `row.usedAt` があれば `reuseDetected` |
+| 盗難 6 | 系統を全部消す | `revokeFamily`（`family_id` で消す）。監査ログに `refresh_token_reuse_detected` |
+| 盗難 7 | invalid_grant | `refresh token already used` |
+| 盗難 8〜10 | 正しい持ち主の RT2 も通らない | 行がもうないので `unknown refresh token` |
+
+手元で試した結果（client を1つ登録し、リフレッシュトークンの行を DB に直接入れて、curl で `/token` を呼んだ）：
+
+| 試したこと | 結果 |
+| --- | --- |
+| RT1 でリフレッシュ | 200。新しいアクセストークン（`expires_in: 300`）と RT2。RT1 の行は使用済み、RT2 の行は14日後が期限 |
+| 新しいアクセストークンで `/userinfo` | 200 |
+| RT1 をもう一度（攻撃者のつもり） | `refresh token already used`。系統の行が0になった |
+| RT2（正しい持ち主） | `unknown refresh token` |
+| 1本の期限が切れた RT | `refresh token expired` |
+| 同意を消してから | `user or consent no longer exists`。系統の行が0になった |
+| 同じ RT で同時に2回 | 片方は 200、もう片方は `already used`。系統ごと消えた（3 節「同時に2回リフレッシュしたら」のとおり） |
+
 
 ### ログアウトと取り消し
 

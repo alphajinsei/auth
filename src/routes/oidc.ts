@@ -1,13 +1,14 @@
 // OIDC の OP（auth）として公開する URL。流れ：docs/steps/4-oidc.md
 // 番号の読み方は src/webauthn.ts と同じ（「ログイン 4」＝ 4-oidc.md の図「ログイン」の 4 番の矢印、「要素②」＝「1. 技術の要素」の ②）
 // 4-a：Discovery と JWKS（図「準備」）。4-b：/authorize（図「ログイン」の 4〜9）。4-c：/token（ログイン 11〜12）、/userinfo（図「/userinfo」）
-// ステップ5（docs/steps/5-tokens.md）：5-a でアクセストークンを JWT にし、/userinfo は図「API を呼ぶ」の形で確かめる
+// ステップ5（docs/steps/5-tokens.md）：5-a でアクセストークンを JWT にし、/userinfo は図「API を呼ぶ」の形で確かめる。
+// 5-b でリフレッシュトークン（/token の grant_type=refresh_token。図「期限切れとリフレッシュ」「盗難の検知」）
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { and, eq, lt } from 'drizzle-orm';
+import { and, eq, isNull, lt } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { db } from '../db/client.js';
 import { ACCESS_TOKEN_TTL_S, issueAccessToken, verifyAccessToken } from '../access-token.js';
-import { authorizationCodes, oauthClients, oauthConsents, users } from '../db/schema.js';
+import { authorizationCodes, oauthClients, oauthConsents, refreshTokens, users } from '../db/schema.js';
 import { jwks, signJwt } from '../jwt.js';
 import { currentUser, rememberReturnTo } from '../session.js';
 import { authorizeErrorPage, consentPage } from '../views.js';
@@ -28,7 +29,7 @@ oidc.get('/.well-known/openid-configuration', (c) =>
 		jwks_uri: `${issuer}/jwks.json`,
 		scopes_supported: ['openid', 'profile'],
 		response_types_supported: ['code'], // 認可コードの流れだけ（implicit は出さない）
-		grant_types_supported: ['authorization_code'],
+		grant_types_supported: ['authorization_code', 'refresh_token'],
 		subject_types_supported: ['public'], // sub はどの RP にも同じ値（users.id）
 		id_token_signing_alg_values_supported: ['ES256'],
 		token_endpoint_auth_methods_supported: ['client_secret_basic'], // client_secret は Authorization ヘッダーで送る
@@ -224,14 +225,21 @@ async function takeCode(code: string) {
 
 const toSeconds = (d: Date) => Math.floor(d.getTime() / 1000);
 
-// ログイン 11：POST /token
+type Client = typeof oauthClients.$inferSelect;
+
+// ログイン 11、リフレッシュ 3：POST /token。grant_type で、認可コードの引き換えか、リフレッシュかに分かれる
 oidc.post('/token', async (c) => {
 	const client = await authenticateClient(c);
 	if (!client) return tokenError(c, 'invalid_client', 'client authentication failed', 401);
 
 	const body = (await c.req.parseBody()) as Record<string, string>;
-	if (body.grant_type !== 'authorization_code') return tokenError(c, 'unsupported_grant_type', 'only authorization_code');
+	if (body.grant_type === 'authorization_code') return codeGrant(c, client, body);
+	if (body.grant_type === 'refresh_token') return refreshGrant(c, client, body);
+	return tokenError(c, 'unsupported_grant_type', 'authorization_code or refresh_token');
+});
 
+// ---- 認可コードの引き換え（図「ログイン」の 11〜13） ----
+async function codeGrant(c: Context, client: Client, body: Record<string, string>) {
 	// 期限の切れたコードを、ついでに掃除する（ここまで来る client は認証済みなので、掃除を外から好きなだけ走らせられない）
 	await db.delete(authorizationCodes).where(lt(authorizationCodes.expiresAt, new Date()));
 
@@ -274,16 +282,108 @@ oidc.post('/token', async (c) => {
 	// ステップ5の要素②：JWT にして、DB には置かない（/userinfo は署名と中身だけで確かめる）
 	const accessToken = issueAccessToken({ issuer, sub: row.userId, clientId: client.id, scope: row.scope }, now);
 
+	// ステップ5の要素④：リフレッシュトークン。ログインのたびに、新しい系統を始める（系統の期限は、ここから30日）
+	const refreshToken = await issueRefreshToken({
+		familyId: randomBytes(16).toString('base64url'),
+		clientId: client.id,
+		userId: row.userId,
+		scope: row.scope,
+		familyExpiresAt: new Date(Date.now() + FAMILY_TTL_MS),
+	});
+
 	audit('token_issued', { clientId: client.id, userId: row.userId });
-	// ログイン 13：返事の形は OAuth 2.0（access_token、token_type、expires_in）に、OIDC が id_token を足したもの
+	// ログイン 13：返事の形は OAuth 2.0（access_token、token_type、expires_in、refresh_token）に、OIDC が id_token を足したもの
 	return c.json({
 		access_token: accessToken,
 		token_type: 'Bearer',
 		expires_in: ACCESS_TOKEN_TTL_S,
 		scope: row.scope,
+		refresh_token: refreshToken,
 		id_token: idToken,
 	});
-});
+}
+
+// ---- リフレッシュ（図「期限切れとリフレッシュ」の 3〜7、図「盗難の検知」） ----
+
+const REFRESH_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 1本の期限：14日使わなければ、ログインし直し
+const FAMILY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 系統の期限：使い続けていても、最初のログインから30日で、ログインし直し
+
+// リフレッシュトークンを作って保存する。1本の期限は「今から14日」と「系統の期限」の早いほう
+async function issueRefreshToken(p: { familyId: string; clientId: string; userId: string; scope: string; familyExpiresAt: Date }) {
+	const token = randomBytes(32).toString('base64url');
+	const expiresAt = new Date(Math.min(Date.now() + REFRESH_TTL_MS, p.familyExpiresAt.getTime()));
+	await db.insert(refreshTokens).values({ tokenHash: sha256hex(token), ...p, expiresAt });
+	return token;
+}
+
+// 系統ごと消す（盗難の検知、同意がなくなったとき。5-c の /revoke でも使う）
+export async function revokeFamily(familyId: string) {
+	await db.delete(refreshTokens).where(eq(refreshTokens.familyId, familyId));
+}
+
+async function refreshGrant(c: Context, client: Client, body: Record<string, string>) {
+	// 系統の期限が切れた行を、ついでに掃除する（使用済みの行も、ここで初めて消える）
+	await db.delete(refreshTokens).where(lt(refreshTokens.familyExpiresAt, new Date()));
+
+	// リフレッシュ 4：リフレッシュトークン（の SHA-256）の行を引く
+	const [row] = await db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, sha256hex(body.refresh_token ?? '')));
+
+	// リフレッシュ 4 のあとの Note：この client のものか、使用済みでないか、期限の内か。外れたら、どれも invalid_grant
+	if (!row) return tokenError(c, 'invalid_grant', 'unknown refresh token'); // 知らない（消えた、系統ごと取り消された）
+	if (row.clientId !== client.id) return tokenError(c, 'invalid_grant', 'refresh token was issued to another client');
+	// 盗難 5 のあとの Note → 盗難 6：使用済みが来た ＝ 同じトークンを2人が持っている。どちらが正しい持ち主かは分からないので、系統ごと消す（要素⑦）
+	if (row.usedAt) return reuseDetected(c, row);
+	if (row.expiresAt < new Date()) return tokenError(c, 'invalid_grant', 'refresh token expired');
+
+	// リフレッシュ 5：判断のし直し（要素⑤）。利用者と同意がまだあるか。なければ、この系統はもう使わせない
+	const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, row.userId));
+	const [consent] = await db
+		.select({ scope: oauthConsents.scope })
+		.from(oauthConsents)
+		.where(and(eq(oauthConsents.userId, row.userId), eq(oauthConsents.clientId, client.id)));
+	const granted = consent?.scope.split(' ') ?? [];
+	if (!user || !row.scope.split(' ').every((s) => granted.includes(s))) {
+		await revokeFamily(row.familyId);
+		return tokenError(c, 'invalid_grant', 'user or consent no longer exists');
+	}
+
+	// リフレッシュ 6 の前半：使用済みにする（要素⑥）。「まだ使っていない」ときだけ書き換える。
+	// 同じトークンで同時に2つ来ても、書き換えられる（affectedRows が 1 になる）のは片方だけ。もう片方は使用済みとして扱う
+	const [marked] = await db
+		.update(refreshTokens)
+		.set({ usedAt: new Date() })
+		.where(and(eq(refreshTokens.tokenHash, row.tokenHash), isNull(refreshTokens.usedAt)));
+	if (marked.affectedRows !== 1) return reuseDetected(c, row);
+
+	// リフレッシュ 6 の後半：同じ系統で、新しいリフレッシュトークンを足す（系統の期限は引き継ぐので、延びない）。
+	// scope は前と同じ（要求の scope で狭めることは、RFC 6749 6 で許されているが、作らない）
+	const refreshToken = await issueRefreshToken({
+		familyId: row.familyId,
+		clientId: client.id,
+		userId: row.userId,
+		scope: row.scope,
+		familyExpiresAt: row.familyExpiresAt,
+	});
+	// リフレッシュ 6 のあとの Note：新しいアクセストークン
+	const accessToken = issueAccessToken({ issuer, sub: row.userId, clientId: client.id, scope: row.scope });
+
+	audit('token_refreshed', { clientId: client.id, userId: row.userId, familyId: row.familyId });
+	// リフレッシュ 7：ID トークンは入れない（OIDC Core 12.2 では入れてもよい。demo-app が「誰か」を知るのはログインのときだけ）
+	return c.json({
+		access_token: accessToken,
+		token_type: 'Bearer',
+		expires_in: ACCESS_TOKEN_TTL_S,
+		scope: row.scope,
+		refresh_token: refreshToken,
+	});
+}
+
+// 盗難 6 → 7：系統ごと消して、invalid_grant。監査ログに残す（本物の盗難なら、あとで調べたい）
+async function reuseDetected(c: Context, row: { familyId: string; clientId: string; userId: string }) {
+	await revokeFamily(row.familyId);
+	audit('refresh_token_reuse_detected', { clientId: row.clientId, userId: row.userId, familyId: row.familyId });
+	return tokenError(c, 'invalid_grant', 'refresh token already used');
+}
 
 // ---- /userinfo（図「API を呼ぶ」。docs/steps/5-tokens.md）。アクセストークンを見せれば、利用者の情報を返す ----
 // auth の中にあるが、ここでは「認可サーバーとは別の API」として振る舞う：トークンの確認に、auth の DB を使わない

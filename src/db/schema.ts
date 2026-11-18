@@ -1,4 +1,4 @@
-import { bigint, datetime, int, mysqlTable, primaryKey, text, timestamp, varchar } from 'drizzle-orm/mysql-core';
+import { bigint, datetime, index, int, mysqlTable, primaryKey, text, timestamp, varchar } from 'drizzle-orm/mysql-core';
 
 // 利用者。登録の画面はなく、管理用のコマンド（src/admin.ts）で作る
 export const users = mysqlTable('users', {
@@ -119,3 +119,26 @@ export const oauthConsents = mysqlTable(
 );
 
 // アクセストークンの表（access_tokens）は、ステップ5で消した。アクセストークンは JWT になり、DB に置かない（docs/steps/5-tokens.md）
+
+// リフレッシュトークン（ステップ5の要素④〜⑦。docs/steps/5-tokens.md）。乱数を Cookie のセッション ID と同じく SHA-256 で置く
+// 系統（family）：1回のログイン（認可コードの引き換え）から、取り替えで続く並び。盗難を見つけたら、系統ごと消す
+export const refreshTokens = mysqlTable(
+	'refresh_tokens',
+	{
+		tokenHash: varchar('token_hash', { length: 64 }).primaryKey(),
+		familyId: varchar('family_id', { length: 22 }).notNull(), // 16バイトの乱数の base64url
+		clientId: varchar('client_id', { length: 64 })
+			.notNull()
+			.references(() => oauthClients.id, { onDelete: 'cascade' }),
+		userId: varchar('user_id', { length: 36 })
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		scope: varchar('scope', { length: 255 }).notNull(),
+		expiresAt: datetime('expires_at').notNull(), // 1本の期限（14日。ただし系統の期限を超えない）
+		familyExpiresAt: datetime('family_expires_at').notNull(), // 系統の期限（最初のログインから30日。取り替えても延びない）
+		// 使用済みなら、使った時刻。取り替えたあとも行を残すのは、もう一度来たときに「知らない」と「使用済み（盗難）」を見分けるため
+		usedAt: datetime('used_at'),
+		createdAt: timestamp('created_at').notNull().defaultNow(),
+	},
+	(t) => [index('refresh_tokens_family_idx').on(t.familyId)],
+);

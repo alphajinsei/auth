@@ -34,6 +34,8 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | --- | --- |
 | `src/index.ts` | 入口（Hono）。POST の `Origin` の確認、`Cache-Control: no-store`、`GET /health`（LB 用。DB を見ない）、`GET /api/health`（DB まで見る）。`PUBLIC_ORIGIN`（外から見た自分の origin）が必須 |
 | `src/routes/login.ts` | `GET/POST /login`、`GET /account`、`POST /logout`。失敗の回数による一時停止と、監査ログ（標準出力の JSON） |
+| `src/routes/oidc.ts` | OIDC の OP：Discovery、`/jwks.json`、`/authorize`、`/token`（認可コードの引き換えと、リフレッシュトークンの取り替え・使用済みの検知）、`/userinfo` |
+| `src/jwt.ts` | ID トークンとアクセストークンの署名の鍵（ES256）、JWKS、JWT を作る・署名を確かめる |
 | `src/access-token.ts` | アクセストークン（JWT、`typ: at+jwt`、5分）を作る・確かめる。`/userinfo` は DB を引かずにこれで確かめる |
 | `src/session.ts` | サーバー側のセッション。Cookie `__Host-session` に乱数の ID、DB にその SHA-256 |
 | `src/password.ts` | パスワードのハッシュと照合（Argon2id） |
