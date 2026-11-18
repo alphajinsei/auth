@@ -1737,3 +1737,32 @@ OIDC では、`/userinfo` は OP（認可サーバー）が持つ API と決ま�
 2. 管理者は全部見られる（RBAC。auth がロールを ID トークンかアクセストークンに載せる。ロードマップに残っていた「認可モデル（E）」はここ）
 3. 特定の人にメモを共有する（RBAC では書けない → ReBAC。関係のテーブルを持つ）
 4. （任意）判断を OPA や Cedar に出して、アプリから外す
+
+### Q. デプロイの手順の `npm run db:init` は、HeatWave MySQL に専用の表領域？と、必要な表を作る操作か
+
+半分合っている。db:init が作るのは**スキーマ（MySQL では database と同じ意味。表を入れる名前空間）と、そのアプリ専用のユーザー**まで。表は作らない。表領域（Oracle の tablespace のような、置き場所の単位）でもない。
+
+| 何を | いつ | どこで |
+| --- | --- | --- |
+| スキーマ `sample_auth_client`、ユーザー `sample_auth_client`、そのスキーマだけの権限 | `npm run db:init`（初回だけ） | 手元 → ssh で ops の VM → `mysql -u admin`（admin のパスワードも、アプリのパスワードも Vault から） |
+| 表（`sessions`） | `npm run deploy` のたび | app VM の上のコンテナで `node dist/migrate.js`。まだ流していないマイグレーションだけを流す |
+
+分けているのは、権限の違いのため。スキーマとユーザーを作るには HeatWave の admin が要るので、admin のパスワードを読める ops でだけやる。表を作るのはアプリ自身のユーザーで足りるので、デプロイのたびにアプリのコンテナが流す。
+
+### Q. `npm run register-client` は具体的にどんな処理を動かしているのか。auth.alphajinsei.com の管理者専用コマンドを呼んでいるなら、外から気軽に叩けて大丈夫なのか。実態は、手元の auth フォルダの管理者用コマンドのラッパーか
+
+どちらでもない。**HTTP で auth.alphajinsei.com を呼んではいない**し、**手元の auth のコードも動かしていない**。ssh で app VM に入り、**動いている本番の auth のコンテナの中で**管理用のコマンドを実行している。
+
+1. 手元：Terraform の出力から、client_id（`sample-auth-client`）、redirect_uri（`https://sample-auth-client.alphajinsei.com/callback`）、Vault の secret の名前を読む
+2. 手元 → app VM：`ssh oci-app`（OCI の Bastion を通る。OCI の認証と SSH の鍵が要る）で、`scripts/remote-register-client.sh` を流し込む
+3. app VM：`platform-secret` で client_secret を Vault から読む（インスタンス・プリンシパル。VM 自身の権限）
+4. app VM：`cd /opt/apps/auth && docker compose exec -T app node dist/admin.js create-client --secret-stdin ...` に、secret を標準入力で渡す。本番の auth のコンテナに入っている `dist/admin.js` が動く
+5. auth のコンテナ：secret の SHA-256 と redirect_uri を、HeatWave の `oauth_clients` に書く
+
+なので、外から叩ける口はない。auth には管理用の HTTP の API がなく、管理はすべて「サーバーに入れる人が、コンテナの中でコマンドを打つ」形（`create-user` も同じ）。守りは **app VM に ssh で入れるかどうか**（Bastion の IAM と SSH の鍵）。そこに入れる人は、もともと `.env` の DB のパスワードも読めるので、このコマンドがあっても危なさは増えない。
+
+動くのが本番のコンテナの中の `dist/admin.js` なので、`--secret-stdin` を足した auth を先にデプロイする必要があった（手順の 1 番目）。
+
+### Q. RBAC には k8s などでなじみがある。ほかのモデルはよく分からないが、RBAC が分かっていれば十分な気もする
+
+実務の多くは RBAC で足りる、というのはそのとおり。1点だけ補足すると、RBAC が苦手なのは「**自分のものだけ**」「共有された相手だけ」のような、データごとの条件。k8s の RBAC も「自分が作った Pod だけ」は書けず、namespace（データの置き場所）で分けて補っている。個人のサービスで出てくる「自分のメモだけ見られる」は、ロールではなく持ち主の列（`sub`）で判断する形になる。

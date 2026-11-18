@@ -76,8 +76,8 @@
 
 ## ステップ6：auth を呼ぶ側のひな形（最後のステップ）
 
-- [ ] demo-app をコンテナにし、独立したリポジトリ [sample-auth-client](https://github.com/alphajinsei/sample-auth-client)（Template repository）として共通基盤に載せる。盗難のまねは持っていかない（学ぶための機能なので、auth の demo-app に残す）
-- [ ] 本番に載せる：`./tf.sh apply`、`npm run db:init`、`npm run register-client`（client_secret は Vault から auth へ流し込み、手元を通さない）、`npm run deploy`
+- [x] demo-app をコンテナにし、独立したリポジトリ [sample-auth-client](https://github.com/alphajinsei/sample-auth-client)（Template repository）として共通基盤に載せる。盗難のまねは持っていかない（学ぶための機能なので、auth の demo-app に残す）
+- [x] 本番に載せる：`./tf.sh apply`、`npm run db:init`、`npm run register-client`（client_secret は Vault から auth へ流し込み、手元を通さない）、`npm run deploy`
 
 ## ステップ7：LDAP（F。やらない）
 
