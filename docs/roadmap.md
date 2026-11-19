@@ -78,12 +78,14 @@
 - [x] demo-app をコンテナにし、独立したリポジトリ [sample-auth-client](https://github.com/alphajinsei/sample-auth-client)（Template repository）として共通基盤に載せる。盗難のまねは持っていかない（学ぶための機能なので、auth の demo-app に残す）
 - [x] 本番に載せる：`./tf.sh apply`、`npm run db:init`、`npm run register-client`（client_secret は Vault から auth へ流し込み、手元を通さない）、`npm run deploy`
 
-## ステップ7：認可（E。アクセス制御を、モジュールとして小さく作る）
+## ステップ7：認可（E。来歴だけ）
+
+2026-11-19：実装はしないことにした。sample-auth-client にメモを足すと、ここまでの認証（authn）の話から論点がずれるため。来歴を読んで終える。
 
 - [x] 来歴：[アクセス制御（認可）](history/7-authorization.md)（アクセス行列、ACL と DAC、MAC、RBAC、ABAC と PEP・PDP、ReBAC と Zanzibar）
-- [ ] シーケンス図と決めること：PEP（アプリの API）と PDP（判断のモジュール）の分け方、どこに置くか
-- [ ] PDP を作る：関係のタプルを持ち、「Check（主体, 関係, 対象）」に答える
-- [ ] アプリから使う：持ち主だけ・共有した相手・管理者（auth が渡すロール。RBAC を関係の1つとして表す）
+- ~~シーケンス図と決めること：PEP（アプリの API）と PDP（判断のモジュール）の分け方、どこに置くか~~
+- ~~PDP を作る：関係のタプルを持ち、「Check（主体, 関係, 対象）」に答える~~
+- ~~アプリから使う：持ち主だけ・共有した相手・管理者（auth が渡すロール。RBAC を関係の1つとして表す）~~
 
 ## ステップ8：LDAP（F。やらない）
 
