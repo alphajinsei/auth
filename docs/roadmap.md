@@ -22,8 +22,8 @@
 
 ## ステップ0.5：用語と流れを理解する
 
-- [ ] [番外編：認証・認可の全体像](notes/extra-auth-overview.md) を読む
-- [ ] [番外編：OAuth・OIDC の用語](notes/extra-auth-terms.md) を読む
+- [x] [番外編：認証・認可の全体像](notes/extra-auth-overview.md) を読む
+- [x] [番外編：OAuth・OIDC の用語](notes/extra-auth-terms.md) を読む
 
 ## ステップ1：パスワードでのログインとセッション（A・B）
 
