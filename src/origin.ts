@@ -4,7 +4,7 @@
 import type { MiddlewareHandler } from 'hono';
 
 // 例外：/token（ステップ4）と /revoke（ステップ5）。ブラウザではなく demo-app のサーバーが呼ぶので Origin が付かない。
-// Cookie を使わず、毎回 client_secret を Authorization ヘッダーで見せる（別のサイトのページからは付けられない）ので、CSRF の心配がない
+// Cookie を使わず、毎回 client_secret を見せる（Authorization ヘッダーか本文。別のサイトのページは secret を知らない）ので、CSRF の心配がない
 const EXEMPT = ['/token', '/revoke'];
 
 export function checkOrigin(allowed: string): MiddlewareHandler {

@@ -27,14 +27,15 @@ oidc.get('/.well-known/openid-configuration', (c) =>
 		token_endpoint: `${issuer}/token`,
 		userinfo_endpoint: `${issuer}/userinfo`,
 		revocation_endpoint: `${issuer}/revoke`, // RFC 8414 の項目（OAuth の認可サーバーの Metadata）。OIDC Discovery にはないが、並べてよい
-		revocation_endpoint_auth_methods_supported: ['client_secret_basic'],
+		revocation_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
 		jwks_uri: `${issuer}/jwks.json`,
 		scopes_supported: ['openid', 'profile', 'email'],
 		response_types_supported: ['code'], // 認可コードの流れだけ（implicit は出さない）
 		grant_types_supported: ['authorization_code', 'refresh_token'],
 		subject_types_supported: ['public'], // sub はどの RP にも同じ値（users.id）
 		id_token_signing_alg_values_supported: ['ES256'],
-		token_endpoint_auth_methods_supported: ['client_secret_basic'], // client_secret は Authorization ヘッダーで送る
+		// client_secret を Authorization ヘッダーで送る（basic）か、本文で送る（post）。post はステップ9で Access のために足した
+		token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
 		code_challenge_methods_supported: ['S256'], // PKCE は SHA-256 だけ（plain は受けない）
 		claims_supported: ['iss', 'sub', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'amr', 'preferred_username', 'email', 'email_verified'],
 	}),
@@ -211,21 +212,54 @@ function tokenError(c: Context, error: string, description: string, status: 400 
 	return c.json({ error, error_description: description }, status);
 }
 
-// ログイン 11 のあとの Note：client を認証する（client_secret_basic）。
-// Authorization: Basic base64(client_id:client_secret)。どちらも URL エンコードしてから「:」でつなぐ決まり（RFC 6749 2.3.1）
-async function authenticateClient(c: Context) {
+// ログイン 11 のあとの Note：client を認証する。client_secret の送り方は2つあり、どちらも受ける（RFC 6749 2.3.1）。
+//   client_secret_basic：Authorization: Basic base64(client_id:client_secret)。どちらも URL エンコードしてから「:」でつなぐ決まり。
+//                        サーバーは必ず受けること（MUST）とされている本筋。demo-app と sample-auth-client はこちら
+//   client_secret_post： 本文のフォームに client_id と client_secret。仕様は「勧めない」が、こちらしか使わない RP も多い。
+//                        Access（ステップ9）がどちらで送るかはドキュメントに書いていないので、両方を受け、監査ログで確かめる
+// どちらも secret そのものを送る。守っているのは TLS と、auth が SHA-256 しか持たないこと
+type ClientAuth =
+	| { ok: true; client: Client }
+	| { ok: false; error: 'invalid_client' | 'invalid_request'; description: string };
+
+async function authenticateClient(c: Context, body: Record<string, string>): Promise<ClientAuth> {
 	const header = c.req.header('authorization') ?? '';
-	if (!header.startsWith('Basic ')) return null;
-	const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
-	const colon = decoded.indexOf(':');
-	if (colon < 0) return null;
-	const id = decodeURIComponent(decoded.slice(0, colon));
-	const secret = decodeURIComponent(decoded.slice(colon + 1));
+	const basic = header.startsWith('Basic ');
+	const post = body.client_secret !== undefined;
+	// RFC 6749 2.3：1つの要求で、2つ以上の方式を使ってはいけない
+	if (basic && post) return { ok: false, error: 'invalid_request', description: 'use only one client authentication method' };
+
+	let id: string;
+	let secret: string;
+	if (basic) {
+		const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+		const colon = decoded.indexOf(':');
+		if (colon < 0) return { ok: false, error: 'invalid_client', description: 'malformed basic credentials' };
+		id = decodeURIComponent(decoded.slice(0, colon));
+		secret = decodeURIComponent(decoded.slice(colon + 1));
+		// basic でも本文に client_id を付けてくる RP はある（RFC 6749 4.1.3）。付けるなら、ヘッダーの値と同じであること
+		if (body.client_id !== undefined && body.client_id !== id) {
+			return { ok: false, error: 'invalid_request', description: 'client_id in body does not match' };
+		}
+	} else if (post) {
+		id = body.client_id ?? '';
+		secret = body.client_secret;
+	} else {
+		return { ok: false, error: 'invalid_client', description: 'client authentication required' };
+	}
+
 	const [client] = await db.select().from(oauthClients).where(eq(oauthClients.id, id));
-	if (!client) return null;
 	// ハッシュ同士を、かかる時間が中身によらない比べ方で比べる（1文字目から順に比べて途中で止まると、時間の差から推測されうる）
-	const ok = timingSafeEqual(Buffer.from(sha256hex(secret)), Buffer.from(client.secretHash));
-	return ok ? client : null;
+	if (!client || !timingSafeEqual(Buffer.from(sha256hex(secret)), Buffer.from(client.secretHash))) {
+		return { ok: false, error: 'invalid_client', description: 'client authentication failed' };
+	}
+	audit('client_authenticated', { clientId: client.id, method: basic ? 'client_secret_basic' : 'client_secret_post', path: c.req.path });
+	return { ok: true, client };
+}
+
+// client の認証に失敗したときの返事。invalid_client は 401、両方の方式を使ったなどの形の誤りは 400
+function clientAuthError(c: Context, auth: Extract<ClientAuth, { ok: false }>) {
+	return tokenError(c, auth.error, auth.description, auth.error === 'invalid_client' ? 401 : 400);
 }
 
 // ログイン 12：認可コードを取り出して消す（一度きり。要素④）。
@@ -243,10 +277,11 @@ type Client = typeof oauthClients.$inferSelect;
 
 // ログイン 11、リフレッシュ 3：POST /token。grant_type で、認可コードの引き換えか、リフレッシュかに分かれる
 oidc.post('/token', async (c) => {
-	const client = await authenticateClient(c);
-	if (!client) return tokenError(c, 'invalid_client', 'client authentication failed', 401);
-
 	const body = (await c.req.parseBody()) as Record<string, string>;
+	const auth = await authenticateClient(c, body);
+	if (!auth.ok) return clientAuthError(c, auth);
+	const { client } = auth;
+
 	if (body.grant_type === 'authorization_code') return codeGrant(c, client, body);
 	if (body.grant_type === 'refresh_token') return refreshGrant(c, client, body);
 	return tokenError(c, 'unsupported_grant_type', 'authorization_code or refresh_token');
@@ -403,9 +438,10 @@ async function reuseDetected(c: Context, row: { familyId: string; clientId: stri
 
 // ログアウト 3：POST /revoke（token、client_id と client_secret）
 oidc.post('/revoke', async (c) => {
-	const client = await authenticateClient(c);
-	if (!client) return tokenError(c, 'invalid_client', 'client authentication failed', 401);
 	const body = (await c.req.parseBody()) as Record<string, string>;
+	const auth = await authenticateClient(c, body);
+	if (!auth.ok) return clientAuthError(c, auth);
+	const { client } = auth;
 	const token = body.token ?? '';
 	if (!token) return tokenError(c, 'invalid_request', 'token is required');
 
