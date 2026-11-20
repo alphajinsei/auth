@@ -35,7 +35,7 @@ auth に `admin create-client` で登録している RP。呼び出し元が増�
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `demo-app` | 学習用の RP | 手元（このリポジトリの `demo-app/`） | `http://localhost:4000/callback` | `openid profile` | `client_secret_basic` | 手元の `demo-app/.env`（git 管理外） | `sub`、`preferred_username`、`amr` | 4〜5 |
 | `sample-auth-client` | RP のひな形 | `sample-auth-client.alphajinsei.com` | `https://sample-auth-client.alphajinsei.com/callback` | `openid profile` | `client_secret_basic` | sample-auth-client の Terraform が作り、Vault | `sub`、`preferred_username`、`amr` | 6 |
-| `cloudflare-access` | todo を守る Cloudflare Access | `alphajinsei.cloudflareaccess.com` | `https://alphajinsei.cloudflareaccess.com/cdn-cgi/access/callback` | `openid email profile` | 未確定（basic と post のどちらも受ける。9-e で監査ログの `client_authenticated` から確かめる） | todo の Terraform が作り、Access の IdP の設定と state（R2） | `email`（Access のポリシーと照らす） | 9（作業中） |
+| `cloudflare-access` | todo を守る Cloudflare Access | `alphajinsei.cloudflareaccess.com` | `https://alphajinsei.cloudflareaccess.com/cdn-cgi/access/callback` | `openid email profile` | `client_secret_basic`（2026-11-20 に監査ログの `client_authenticated` で確かめた） | todo の Terraform が作り、Access の IdP の設定と state（R2） | `email`（Access のポリシーと照らす）、`amr`（Access の JWT に写る） | 9 |
 
 - `cloudflare-access` は Cloudflare のアカウントに1つの IdP の設定なので、todo 以外の Access のアプリ（hoikuen など）からも選べるようになる。使うアプリが増えたら、ここの「何か」を直す。
 

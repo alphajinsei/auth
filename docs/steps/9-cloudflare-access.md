@@ -62,7 +62,7 @@ sequenceDiagram
 | PKCE | `pkce_enabled` で、すべてのログインで行う（方式は書いていない） | S256 必須 | 有効にする。S256 でなければ 5 で止まるので分かる |
 | scope | `scopes` で指定（例は `openid email profile`） | `openid profile` だけ。知らない scope は黙って外す | `email` を足す |
 | email | ID トークンの `email` クレームで利用者を見分ける（名前は `email_claim_name` で変えられる） | 出していない | 足す |
-| client の認証 | **書いていない**（Basic ヘッダーか、本文か） | `client_secret_basic` だけ | `client_secret_post` も受ける |
+| client の認証 | **書いていない**（Basic ヘッダーか、本文か） | `client_secret_basic` だけ | `client_secret_post` も受ける。→ 実際は `client_secret_basic` だった（9-e の監査ログ）。post は、他の RP のために残す |
 | state、nonce | 書いていない | state 必須、nonce は来たら返す | なし。state を送ってこなければ 5 で止まるので分かる |
 | `email_verified` | 見るかどうか書いていない | 出していない | 出す |
 
