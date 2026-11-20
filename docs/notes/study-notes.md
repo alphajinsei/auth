@@ -1,6 +1,6 @@
 # 勉強メモ：認証・認可
 
-最終更新：2026-11-19
+最終更新：2026-11-20
 
 [ロードマップ](../roadmap.md) を進める中で出てきた疑問と、その答えを積み上げていくメモ。1つの問いに1つの見出しを立てる。答えは、会話の中で説明した内容を、圧縮せずにそのまま残す（あとから読み返して「当時何を理解したのか」が分かるように）。とくに長い話は番外編（`extra-*.md`）に分けて、答えからリンクする。インフラや開発環境の話は、infra リポジトリの [勉強メモ](https://github.com/alphajinsei/cf-infra-playbook/blob/main/docs/notes/study-notes.md)。
 
@@ -1959,3 +1959,66 @@ Zanzibar の Check は、この証明の探索を、分散したデータの上�
 - **規則**：GitLab は DeclarativePolicy という自前のライブラリ（Ruby）で、「Developer 以上なら push できる」のような規則を書いている。API は「この人はこのプロジェクトに push_code できるか」と聞くだけ
 
 つまり、**ロールを「対象ごと」に付け（そのプロジェクトの Developer）、対象の階層で継承する**形。分類としては「リソースごとの RBAC ＋ 階層」で、ReBAC の考え方（関係と継承）にかなり近い。ReBAC は、こういう作りを一般の形にして、専用の仕組みに切り出したものと見ることもできる。
+
+## Cloudflare Access を RP にする（ステップ9）
+
+設計：[ステップ9の設計](../steps/9-cloudflare-access.md)
+
+### Q. 認証が済んだときにサードパーティ（Access）に出す ID トークンに、email という項目も入れる、ということか。Cloudflare の側で、この email の欄を検証すると
+
+そのとおり。auth が Access 宛ての ID トークンに `email`（と `email_verified`）を入れ、Access はそれを見て「このアドレスなら通す」という todo のポリシーと照らす。
+
+Access がする確認は2段になる。
+
+1. **ID トークンそのものを確かめる**：auth の JWKS の公開鍵で署名を確かめ、iss・aud・exp などを見る（demo-app がステップ4でしたことと同じ）。
+2. **中身をポリシーと照らす**：`email` が、todo の Access のポリシー（編集を許すアドレスの一覧）に入っているか。
+
+今の auth は ID トークンに `sub`（UUID）と `preferred_username` しか入れていない。Access のポリシーはメールアドレスで書くので、`email` がないと照らせない。それで auth に email を足す。
+
+`email_verified: true` も入れる。これは「このアドレスは本当にこの人のものだと、IdP が確かめた」という意味。auth ではアドレスを入れるのが管理者（自分）だけなので true にできる。利用者が自分でアドレスを書ける IdP で、確かめずに true を出すと、他人のアドレスを書いた人が、email で利用者を見分ける RP に、その人として入れてしまう。
+
+### Q. client の認証は client_secret という秘密を送ることで確かめるが、送り方が2種類あり、auth は片方しか受けておらず、Cloudflare がどちらで送ってくるか分からないので、両方に備えてもう片方も作っておく、という理解でよいか。秘密って直接送るんでしたっけ
+
+その理解で合っている。そして、秘密はそのまま送る。2つとも、client_secret そのものを、TLS で暗号化された通信の上で `/token` に送る方式。
+
+| 方式 | 送り方 | 決まり |
+| --- | --- | --- |
+| `client_secret_basic` | `Authorization: Basic base64(client_id:client_secret)` のヘッダー | RFC 6749 2.3.1。サーバーは必ず受けること（MUST） |
+| `client_secret_post` | 本文のフォームに `client_id=...&client_secret=...` | 同じ節。「使ってもよいが、勧めない」（NOT RECOMMENDED） |
+
+どちらも中身は同じで、置く場所が違うだけ。仕様は basic を本筋にしているが、実際には post しか使わない RP も多い。Access のドキュメントにはどちらを使うかが書いていないので、両方を受けて、監査ログでどちらが来たかを確かめる。1つの要求で両方を使ってきたら断る（RFC 6749 2.3：2つ以上の方式を使ってはいけない）。
+
+「秘密をそのまま送る」のは、パスワードのログインと同じ形。守っているのは次の3つ。
+
+- **TLS**：通信の途中では読めない。
+- **auth は SHA-256 しか持たない**：auth の DB が漏れても、secret そのものは分からない。
+- **裏の通信だけ**：`/token` は RP のサーバーから auth へ直接送る。ブラウザを通らないので、利用者の端末や URL に secret が出ない。
+
+それでも「相手に秘密そのものを見せる」ことに変わりはない。送らずに済ませる方式もある。
+
+| 方式 | 何を送るか | auth が持つもの |
+| --- | --- | --- |
+| `client_secret_jwt`（OIDC Core 9） | client_secret を鍵にした HMAC で署名した、短命の JWT | client_secret（ハッシュではなく、そのもの。HMAC を計算し直すため） |
+| `private_key_jwt`（OIDC Core 9） | client の秘密鍵で署名した、短命の JWT | client の公開鍵だけ |
+| mTLS（RFC 8705） | TLS のクライアント証明書 | 証明書（または、その指紋） |
+
+`private_key_jwt` と mTLS は、auth に秘密を預けない。FAPI（金融向けのプロファイル）などの厳しいところでは、こちらを求める。auth は作っていない（設計の「OIDC の OP として、足りていないもの」）。
+
+→ client_secret そのものが何かは、上の節の「client_secret ってなんでしたっけ」。
+
+### Q. Cloudflare から auth に対して「今後うちのシステムから auth に OIDC の認証の依頼を飛ばすのでよろしくね。client_id はこれ、コールバック先はこれ」のような設定が要るはず。これが 9-d か
+
+そのとおり、9-d。ただし向きは「Cloudflare が auth に知らせる」ではなく、**両側に、それぞれ相手のことを人が書き込む**。
+
+| どこに書くか | 何を書くか | 9-d での作業 |
+| --- | --- | --- |
+| auth（OP） | この client_id の client がいる。戻り先（redirect_uri）はこの URL だけ。secret のハッシュはこれ | `admin create-client --secret-stdin cloudflare-access https://alphajinsei.cloudflareaccess.com/cdn-cgi/access/callback` |
+| Access（RP） | auth の `/authorize`・`/token`・JWKS の URL。自分の client_id と client_secret。PKCE を使う。scope | todo の Terraform に `cloudflare_zero_trust_access_identity_provider` を足して apply |
+
+auth の側の登録が要るのは、`/authorize` に来た要求を照らすため。知らない client_id や、登録と1文字でも違う redirect_uri なら、auth はコードを出さない（ステップ4の要素②）。これがないと、誰でも「Access のふり」をして、コードを自分のサイトに送らせられる。
+
+Access の側の設定が要るのは、どこへ利用者を送り、どこでコードを引き換え、どの鍵で ID トークンを確かめるかを知るため。auth は Discovery を出しているが、Access は Discovery を自分では読まず、URL を3つ手で書く形（人が Discovery を読んで写す）。
+
+secret は両側で同じ値を持つ必要があるので、片方で作って、もう片方へ運ぶ。今回は todo の Terraform が作って Access の設定に入れ、`./tf.sh output` から ssh で auth に流し込む。
+
+「よろしくね」を RP の側から機械的に送る仕組みもある。**動的な client の登録**（RFC 7591、OIDC Dynamic Client Registration）で、RP が OP の登録の口に POST すると、client_id と secret が返ってくる。誰でも登録できる口を開けることになるので、auth は作っていない（設計の「足りていないもの」）。Access もこれは使わず、手で設定する形。

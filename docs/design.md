@@ -1,6 +1,6 @@
 # 設計：認証基盤（auth.alphajinsei.com）
 
-最終更新：2026-11-07
+最終更新：2026-11-20
 
 既製品（Keycloak など）を使わずに自作する、認証・認可のサーバー。目的は2つで、認証・認可を一分野として学ぶことと、実際に動くものを持つこと。分野の全体像は [番外編：認証・認可の全体像](notes/extra-auth-overview.md)、進め方は [ロードマップ](roadmap.md)。
 
@@ -19,6 +19,7 @@
 | IdP（このリポジトリの `src/`） | `auth.alphajinsei.com`（app VM の 8002） | ログイン画面、セッション、OIDC プロバイダー、OAuth の認可サーバー |
 | デモのアプリ（demo-app） | 手元（`localhost:4000`）。学習用 | 「auth でログイン」する側（OIDC の RP）。「auth がログインしてよいと言っているから、うちにもログインさせる」アプリ。盗難のまねなど、学ぶための機能も持つ |
 | ひな形（[sample-auth-client](https://github.com/alphajinsei/sample-auth-client)） | `sample-auth-client.alphajinsei.com`（app VM の 8003） | demo-app をコンテナにして独立させたもの。今後のサービスが auth でログインするときのひな形 |
+| Cloudflare Access（ステップ9） | `alphajinsei.cloudflareaccess.com` | 自分で書いていない RP。todo（`todo.alphajinsei.com/admin`）の前に立つ門番で、ログインの選択肢の1つとして auth を使う。auth の ID トークンを確かめたあと、自分の JWT を出し直して todo に渡す |
 
 - demo-app は、これから作る個人のサービスが auth でログインするときの**ひな形（認証を受ける側のサンプル）**にする。ステップ4では手元で動かし、形が固まったら sample-oci-vm-docker と同じく独立したリポジトリ（Template repository）にして共通基盤に載せる（ステップ6。名前は `sample-auth-client`）。学ぶための機能（盗難のまね）は持っていかず、demo-app はこのリポジトリに学習用として残す。
 - OIDC も OAuth も、RP が localhost にあっても成り立つ。
@@ -88,6 +89,20 @@ ID・パスワードだけ、ID・パスワード + TOTP、パスキー、を自
 - ID トークンとアクセストークンは JWT（ES256）。リフレッシュトークンは不透明な乱数で、DB に置き、使うたびに取り替える。
 - クライアントは管理用のコマンドで登録する（動的な登録は作らない）。`redirect_uri` は完全一致で比べる。
 - Discovery（`/.well-known/openid-configuration`）と JWKS（`/jwks.json`）を公開する。
+- client の認証は、`client_secret_basic`（Authorization ヘッダー）と `client_secret_post`（本文）の2つを受ける。1つの要求で両方を使ってきたら断る（RFC 6749 2.3）。`client_secret_post` は、どちらで送ってくるか分からない Access のために足した（ステップ9）。
+
+### email
+
+- `users` に `email` を持つ（空でもよい、重複は不可）。入れるのは管理用のコマンド（`admin set-email`）だけ。
+- `email` scope があるときだけ、ID トークンと `/userinfo` に `email` と `email_verified` を入れる（OIDC Core 5.4）。
+- `email_verified` は `true`。アドレスを入れるのは管理者だけで、利用者が書く口がないため。利用者がアドレスを書けるようにするなら（「6. 今後の発展」の新規登録）、確認のメールが済むまで `false` にする。確かめていないアドレスを `true` で出すと、email で利用者を見分ける RP（Access など）で、他人のアドレスを書いた人がその人になりすませる。
+- 経緯：Access は ID トークンの `email` で利用者を見分け、ポリシー（「このアドレスなら通す」）と照らすため（ステップ9）。
+
+### 自分で書いていない RP（ステップ9）
+
+- 登録のしかたは、自分の RP と同じ（`admin create-client --secret-stdin`）。client_secret は RP の側の Terraform が作る。Access の場合は todo の Terraform が作って Access の IdP の設定に入れ、auth へは ssh で流し込む（Vault は経由しない。todo の Terraform は Cloudflare だけを扱うため）。
+- 相手の求めることは、ドキュメントで分かる範囲で合わせ、分からないこと（client の認証の方式など）は両方を受けて、監査ログで実際を確かめる。
+- 詳しくは [ステップ9の設計](steps/9-cloudflare-access.md)。
 
 ### OIDC の OP として、足りていないもの
 
@@ -102,6 +117,7 @@ ID・パスワードだけ、ID・パスワード + TOTP、パスキー、を自
 | | 署名の鍵の入れ替え（JWKS に新旧を並べる） | 鍵は1つ。作り直すと、出した ID トークンが検証できなくなる |
 | | 同意の管理画面、client の管理（secret の作り直し、redirect_uri の追加） | 管理用のコマンドで登録するだけ |
 | | public client（secret を持てない SPA、スマホのアプリ） | confidential client（client_secret あり）だけ |
+| | secret を送らない client の認証（`private_key_jwt`、`client_secret_jwt`、mTLS） | `client_secret_basic` と `client_secret_post`（secret そのものを TLS の上で送る）だけ |
 | | `/token` の回数の制限、盗難の検知の通知 | 監査ログに出すだけ |
 | 用途によって足す | client_credentials、デバイスの流れ（RFC 8628）、Introspection（RFC 7662）、動的な登録（RFC 7591）、PAR（RFC 9126）、DPoP（RFC 9449）・mTLS、ペアワイズの sub | 作らない |
 
@@ -137,3 +153,4 @@ auth を、自分が管理するサービス全体の認証基盤にしていく
 - 2026-11-19：demo-app を `sample-auth-client` として独立させることにした。名前は、基盤（OCI、コンテナ）ではなく「auth を呼ぶ側」という役割で付けた。セッションは DB に置く（デプロイで切れないように）。client_secret は client の Terraform が作って Vault に置き、`admin create-client --secret-stdin` で auth に流し込む。auth への通信は公開の URL（Cloudflare の上のアプリと同じ道）。LDAP はやめ、これを最後のステップにした。
 - 2026-11-19：認可（アクセス制御）をステップ7として足した。RBAC で実務は足りるが、判断をモジュール（PDP）として切り出す作りを見るために、関係のタプルで答える PDP を小さく作る。
 - 2026-11-19：認可は実装しないことにした（来歴だけ）。メモを作ると、認証の話から論点がずれるため。
+- 2026-11-20：todo を守る Cloudflare Access に「auth でログイン」を足すことにした（ステップ9）。そのために、email（`users.email`、`email` scope、`email_verified`）と `client_secret_post` を足す。本番に関わるコマンド（デプロイ、apply、client の登録）は、ユーザーが実行する。

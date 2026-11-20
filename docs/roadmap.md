@@ -1,6 +1,6 @@
 # ロードマップ：認証基盤
 
-最終更新：2026-11-15
+最終更新：2026-11-20
 
 [設計](design.md) を、ステップごとに作っていく。分野の全体像は [番外編：認証・認可の全体像](notes/extra-auth-overview.md)。
 
@@ -94,3 +94,14 @@
 - ~~来歴：X.500 から LDAP、Active Directory まで~~
 - ~~番外編：ディレクトリの木構造、bind と search、BER~~
 - ~~OpenLDAP を手元のコンテナで動かし、`ldapsearch` を叩く~~
+
+## ステップ9：Cloudflare Access を RP にする（C）
+
+2026-11-20：todo（`todo.alphajinsei.com/admin`）を守る Cloudflare Access に、「auth でログイン」を足す。自分で書いていない RP を、初めてつなぐ。新しい技術ではないので、来歴は書かない。
+
+- [x] 設計とシーケンス図：[ステップ9の設計](steps/9-cloudflare-access.md)
+- [ ] 9-a：`users.email`、`admin set-email`、`email` scope と `email`・`email_verified` のクレーム
+- [ ] 9-b：`/token` と `/revoke` で `client_secret_post` も受ける
+- [ ] 9-c：本番に載せ、自分のアカウントに email を入れる
+- [ ] 9-d：todo の Terraform に OIDC の IdP を足し、auth に client を登録する
+- [ ] 9-e：todo の `/admin` に、auth のパスキーでログインする
