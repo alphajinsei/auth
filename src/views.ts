@@ -141,6 +141,7 @@ export const totpSetupPage = (qrDataUrl: string, secretBase32: string, error?: s
 const scopeLabel: Record<string, string> = {
 	openid: 'あなたの ID（このアプリの中であなたを見分けるための番号）',
 	profile: 'ユーザー名',
+	email: 'メールアドレス',
 };
 
 // 同意画面（図「ログイン」の 5）。要求の中身は隠し項目で POST /authorize に持ち回る

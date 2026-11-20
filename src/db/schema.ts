@@ -5,6 +5,10 @@ export const users = mysqlTable('users', {
 	// UUID。外に見せる利用者の ID（ステップ4で OIDC の sub になる）。連番にしないのは、人数や登録順を推測させないため
 	id: varchar('id', { length: 36 }).primaryKey(),
 	username: varchar('username', { length: 64 }).notNull().unique(),
+	// メールアドレス（ステップ9）。OIDC の email クレームに入れる。入れるのは管理用のコマンド（set-email）だけなので、
+	// email_verified は true として出す。空でもよい。重複は不可（RP が email で利用者を見分けるので、2人が同じ値だと取り違える）。
+	// 254 は、アドレスとして通る長さの上限（RFC 5321 の経路の上限 256 から、前後の < > を引いたもの）
+	email: varchar('email', { length: 254 }).unique(),
 	// Argon2id のハッシュ。アルゴリズム・パラメータ・ソルトも中に入っている（$argon2id$v=19$m=...,t=...,p=...$ソルト$ハッシュ）
 	// 空ならパスワードなし（パスキーだけのアカウント。ステップ3-c）
 	passwordHash: varchar('password_hash', { length: 255 }),

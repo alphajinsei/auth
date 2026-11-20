@@ -75,6 +75,20 @@ async function setPassword(username: string) {
 	console.log(`set password for "${username}"`);
 }
 
+// メールアドレスを設定する（ステップ9）。ID トークンの email クレームになり、Access などの RP はこれで利用者を見分ける。
+// ここで入れたアドレスは email_verified: true として出すので、本人のものだと確かめてから入れる。
+// 「-」を渡すと消す。ほかの利用者が使っているアドレスは、列の重複不可の制約で断られる
+async function setEmail(username: string, email: string) {
+	const value = email === '-' ? null : email.trim().toLowerCase();
+	// 形だけ見る（@ が1つ、前後が空でない、空白を含まない）。届くかどうかは見ない
+	if (value !== null && (!/^[^\s@]+@[^\s@]+$/.test(value) || value.length > 254)) throw new Error(`not an email address: ${email}`);
+	const [existing] = value ? await db.select({ username: users.username }).from(users).where(eq(users.email, value)) : [];
+	if (existing && existing.username !== username) throw new Error(`email is already used by "${existing.username}"`);
+	const [result] = await db.update(users).set({ email: value }).where(eq(users.username, username));
+	if (result.affectedRows === 0) throw new Error(`user "${username}" not found`);
+	console.log(value ? `set email of "${username}" to ${value}` : `removed email of "${username}"`);
+}
+
 // RP（client）を登録する（ステップ4）。client_secret はここで一度だけ表示する。DB には SHA-256 だけを置くので、なくしたら登録し直す
 //   例：admin create-client demo-app http://localhost:4000/callback "デモのアプリ"
 // --secret-stdin：secret をここで作らず、標準入力から1行読む（表示もしない）。共通基盤に載せる client 用で、
@@ -116,9 +130,10 @@ try {
 	if (command === 'create-user' && args[0]) await createUser(args[0]);
 	else if (command === 'unlock' && args[0]) await unlockUser(args[0]);
 	else if (command === 'set-password' && args[0]) await setPassword(args[0]);
+	else if (command === 'set-email' && args[1]) await setEmail(args[0], args[1]);
 	else if (command === 'create-client' && args[1]) await createClient(args[0], args[1], args[2] ?? args[0], secretFromStdin);
 	else {
-		console.error('usage: admin create-user <username> | unlock <username> | set-password <username> | create-client [--secret-stdin] <client_id> <redirect_uri> [name]');
+		console.error('usage: admin create-user <username> | unlock <username> | set-password <username> | set-email <username> <email|-> | create-client [--secret-stdin] <client_id> <redirect_uri> [name]');
 		process.exitCode = 1;
 	}
 } catch (e) {

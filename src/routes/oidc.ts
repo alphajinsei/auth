@@ -29,14 +29,14 @@ oidc.get('/.well-known/openid-configuration', (c) =>
 		revocation_endpoint: `${issuer}/revoke`, // RFC 8414 の項目（OAuth の認可サーバーの Metadata）。OIDC Discovery にはないが、並べてよい
 		revocation_endpoint_auth_methods_supported: ['client_secret_basic'],
 		jwks_uri: `${issuer}/jwks.json`,
-		scopes_supported: ['openid', 'profile'],
+		scopes_supported: ['openid', 'profile', 'email'],
 		response_types_supported: ['code'], // 認可コードの流れだけ（implicit は出さない）
 		grant_types_supported: ['authorization_code', 'refresh_token'],
 		subject_types_supported: ['public'], // sub はどの RP にも同じ値（users.id）
 		id_token_signing_alg_values_supported: ['ES256'],
 		token_endpoint_auth_methods_supported: ['client_secret_basic'], // client_secret は Authorization ヘッダーで送る
 		code_challenge_methods_supported: ['S256'], // PKCE は SHA-256 だけ（plain は受けない）
-		claims_supported: ['iss', 'sub', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'amr', 'preferred_username'],
+		claims_supported: ['iss', 'sub', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'amr', 'preferred_username', 'email', 'email_verified'],
 	}),
 );
 
@@ -46,7 +46,19 @@ oidc.get('/jwks.json', (c) => c.json(jwks));
 // ---- /authorize（図「ログイン」の 4〜9）----
 
 const CODE_TTL_MS = 60 * 1000;
-const SUPPORTED_SCOPES = ['openid', 'profile'];
+const SUPPORTED_SCOPES = ['openid', 'profile', 'email'];
+
+// scope に応じて、利用者の情報のクレームを選ぶ。ID トークンと /userinfo で同じものを返す（OIDC Core 5.4）。
+// profile → preferred_username。email → email と email_verified（ステップ9）。
+// email_verified は true：アドレスを入れるのは管理用のコマンド（set-email）だけで、利用者が自分で書く口がないため。
+// アドレスが未設定なら、email も email_verified も入れない（空の値は出さない）
+function userClaims(scopes: string[], user: { username: string; email: string | null }) {
+	return {
+		...(scopes.includes('profile') ? { preferred_username: user.username } : {}),
+		...(scopes.includes('email') && user.email ? { email: user.email, email_verified: true } : {}),
+	};
+}
+
 const sha256hex = (s: string) => createHash('sha256').update(s).digest('hex');
 
 function audit(event: string, fields: Record<string, unknown>) {
@@ -262,7 +274,7 @@ async function codeGrant(c: Context, client: Client, body: Record<string, string
 		return tokenError(c, 'invalid_grant', 'PKCE verification failed');
 	}
 
-	const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, row.userId));
+	const [user] = await db.select({ username: users.username, email: users.email }).from(users).where(eq(users.id, row.userId));
 	if (!user) return tokenError(c, 'invalid_grant', 'user no longer exists');
 	const scopes = row.scope.split(' ');
 	const now = Math.floor(Date.now() / 1000);
@@ -277,7 +289,7 @@ async function codeGrant(c: Context, client: Client, body: Record<string, string
 		auth_time: toSeconds(row.authTime), // 実際にログインした時刻（SSO の2回目は、最初の時刻のまま）
 		...(row.nonce ? { nonce: row.nonce } : {}), // 要素⑨：/authorize で受けた値をそのまま返す
 		amr: row.amr.split(' '), // RFC 8176 では配列。例：["hwk", "mfa"]
-		...(scopes.includes('profile') ? { preferred_username: user.username } : {}),
+		...userClaims(scopes, user), // scope に応じて preferred_username、email、email_verified
 	});
 
 	// アクセストークン（/userinfo を呼ぶ許可証）。ステップ4は乱数を DB で引く形だった。
@@ -439,10 +451,10 @@ oidc.get('/userinfo', async (c) => {
 	const scopes = claims.scope.split(' ');
 	if (!scopes.includes('openid')) return bearerError(c, 'insufficient_scope', 'openid scope required');
 
-	// API 2：ユーザー名は、トークンに書いた値ではなく今の値を返したいので、ここは DB を引く（トークンを確かめるためではない）
-	const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, claims.sub));
+	// API 2：ユーザー名とメールアドレスは、トークンに書いた値ではなく今の値を返したいので、ここは DB を引く（トークンを確かめるためではない）
+	const [user] = await db.select({ username: users.username, email: users.email }).from(users).where(eq(users.id, claims.sub));
 	if (!user) return bearerError(c, 'invalid_token', 'user no longer exists');
 
 	// API 3：sub は ID トークンと同じ値。RP は「ID トークンの sub と一致するか」を確かめる決まり（OIDC Core 5.3.2）
-	return c.json({ sub: claims.sub, ...(scopes.includes('profile') ? { preferred_username: user.username } : {}) });
+	return c.json({ sub: claims.sub, ...userClaims(scopes, user) });
 });

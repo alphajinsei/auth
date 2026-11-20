@@ -2022,3 +2022,37 @@ Access の側の設定が要るのは、どこへ利用者を送り、どこで�
 secret は両側で同じ値を持つ必要があるので、片方で作って、もう片方へ運ぶ。今回は todo の Terraform が作って Access の設定に入れ、`./tf.sh output` から ssh で auth に流し込む。
 
 「よろしくね」を RP の側から機械的に送る仕組みもある。**動的な client の登録**（RFC 7591、OIDC Dynamic Client Registration）で、RP が OP の登録の口に POST すると、client_id と secret が返ってくる。誰でも登録できる口を開けることになるので、auth は作っていない（設計の「足りていないもの」）。Access もこれは使わず、手で設定する形。
+
+### Q. email を足すというのは、ID トークンの users という項目に、email という子項目を足すということか
+
+違う。`users` は auth の **DB の表**の名前で、ID トークンの中の項目ではない。ID トークンの中身は入れ子のない平らな JSON で、`email` はその一番上に、`sub` や `iss` と並べて足す。
+
+流れは3段になる。
+
+1. **DB（`users` の表）**：利用者1人につき1行。ここに `email` の列を足す（マイグレーション `0009_user_email.sql`）。
+
+   | id | username | email |
+   | --- | --- | --- |
+   | 8f45c8e6-... | emailtest | （空） |
+
+2. **管理用のコマンド**：`admin set-email emailtest email.test@example.com` で、その行の `email` を埋める。画面からは書けない。
+3. **`/token`（ID トークンを作るとき）**：auth は、認可コードに記録した利用者の行を `users` から引く。scope に `email` があり、行に email が入っていれば、ID トークンの JSON に `email` と `email_verified` の2つを足して署名する。`/userinfo` も同じものを返す。
+
+ID トークンの中身（payload）は、こう変わる。
+
+```jsonc
+// 前（scope：openid profile）
+{ "iss": "https://auth.alphajinsei.com", "sub": "8f45c8e6-...", "aud": "cloudflare-access",
+  "exp": ..., "iat": ..., "auth_time": ..., "nonce": "...", "amr": ["hwk"],
+  "preferred_username": "emailtest" }
+
+// 後（scope：openid email profile、email を設定済み）
+{ "iss": "https://auth.alphajinsei.com", "sub": "8f45c8e6-...", "aud": "cloudflare-access",
+  "exp": ..., "iat": ..., "auth_time": ..., "nonce": "...", "amr": ["hwk"],
+  "preferred_username": "emailtest",
+  "email": "email.test@example.com", "email_verified": true }
+```
+
+- `email`、`email_verified` という名前は、OIDC が決めている標準のクレーム（OIDC Core 5.1）。名前が決まっているので、Access のような他人の RP も、何も打ち合わせずに読める。Access は既定で `email` という名前を読む（`email_claim_name` で変えられる）。
+- 出すかどうかは、RP が `/authorize` で求めた scope で決まる（OIDC Core 5.4：`email` scope ＝「`email` と `email_verified` をください」）。demo-app と sample-auth-client は `openid profile` しか求めないので、これまでどおり email は出ない。
+- 利用者は同意画面で「メールアドレス」を渡すことに同意する。

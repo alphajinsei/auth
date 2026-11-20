@@ -64,6 +64,13 @@
       "when": 1795005860730,
       "tag": "0008_refresh_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1795181257714,
+      "tag": "0009_user_email",
+      "breakpoints": true
     }
   ]
 }

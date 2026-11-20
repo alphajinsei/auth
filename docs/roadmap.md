@@ -100,7 +100,7 @@
 2026-11-20：todo（`todo.alphajinsei.com/admin`）を守る Cloudflare Access に、「auth でログイン」を足す。自分で書いていない RP を、初めてつなぐ。新しい技術ではないので、来歴は書かない。
 
 - [x] 設計とシーケンス図：[ステップ9の設計](steps/9-cloudflare-access.md)
-- [ ] 9-a：`users.email`、`admin set-email`、`email` scope と `email`・`email_verified` のクレーム
+- [x] 9-a：`users.email`、`admin set-email`、`email` scope と `email`・`email_verified` のクレーム
 - [ ] 9-b：`/token` と `/revoke` で `client_secret_post` も受ける
 - [ ] 9-c：本番に載せ、自分のアカウントに email を入れる
 - [ ] 9-d：todo の Terraform に OIDC の IdP を足し、auth に client を登録する
