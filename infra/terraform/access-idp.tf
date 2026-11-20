@@ -1,7 +1,7 @@
 # ---- Cloudflare Access のログインの選択肢「auth.alphajinsei.com」（ステップ9） ----
 # Access が OIDC の RP（client_id：cloudflare-access）、auth が OP。流れは docs/steps/9-cloudflare-access.md
 # IdP の設定は Cloudflare のアカウントに1つで、Access のどのアプリ（todo など）からも選べる。auth の窓口なので、auth のリポジトリで持つ
-# （2026-11-20 に todo のリポジトリから移した。経緯は docs/design.md の「7. 検討の経緯」）
+# （2026-11-20 に todo のリポジトリから import で移した。経緯は docs/design.md の「7. 検討の経緯」）
 
 # Access の設定を変えるトークン。cloudflare.tf の DNS 用のトークンとは別のもの（権限：Access の Apps and Policies と、Identity Providers）。
 # tf.sh が infra/.secrets/terraform-cloudflare.env から読んで、TF_VAR_cloudflare_access_api_token に入れる
@@ -18,13 +18,6 @@ provider "cloudflare" {
 locals {
   cloudflare_account_id = "da07fbd6d431eccc008a74d695734e73"
   access_client_id      = "cloudflare-access" # auth に登録する client_id（設計の「登録している client」の台帳）
-}
-
-# 移すときに1回だけ使う：todo の state で管理していた、すでにある IdP を、この state に取り込む。
-# 取り込みが済んだら、このブロックは消してよい（残しても何もしない）
-import {
-  to = cloudflare_zero_trust_access_identity_provider.access
-  id = "accounts/${local.cloudflare_account_id}/e7f59209-7657-45a0-ab97-ef98abd2874c"
 }
 
 # client_secret：Terraform が作って Vault に入れる（sample-auth-client と同じ経路）。
