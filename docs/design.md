@@ -6,7 +6,18 @@
 
 ## 1. 位置づけ
 
-- OCI の共通基盤（方式③）の Docker ホストに載る、アプリの1つ。共通基盤に足すのは、LB の振り分け1つ（ポート 8002）と、HeatWave のスキーマ1つだけ。共通基盤の仕様は [oci-platform の README](https://github.com/alphajinsei/oci-platform#readme)。置き場所を決めた経緯は [方式検討：OCI](https://github.com/alphajinsei/cf-infra-playbook/blob/main/docs/design/oci.md) の 10。
+- OCI の共通基盤（方式③）の Docker ホストに載る、アプリの1つ。共通基盤に足すものは下の表。共通基盤の仕様は [oci-platform の README](https://github.com/alphajinsei/oci-platform#readme)。置き場所を決めた経緯は [方式検討：OCI](https://github.com/alphajinsei/cf-infra-playbook/blob/main/docs/design/oci.md) の 10。
+- auth の Terraform（`infra/terraform/`）が、auth の外に作るもの：
+
+  | どこに | 何を | ファイル | 何のため |
+  | --- | --- | --- | --- |
+  | OCI の LB | ホスト名・リスナー・バックエンド・セット（ポート 8002） | `main.tf` | `auth.alphajinsei.com` を app VM の auth に届ける |
+  | OCI の MySQL HeatWave | スキーマと利用者 | `main.tf`（作るのは `npm run db:init`） | 利用者、セッション、client などの表 |
+  | OCI の Vault | DB のパスワード、TOTP の鍵、ID トークンの署名の鍵、Access の client_secret | `main.tf`、`access-idp.tf` | 秘密を手元とリポジトリに置かない |
+  | Cloudflare の DNS | `auth.alphajinsei.com` のレコード | `cloudflare.tf` | |
+  | Cloudflare Access（アカウント全体） | ログインの選択肢「auth.alphajinsei.com」（OIDC の IdP） | `access-idp.tf` | Access で守るアプリ（todo など）に、auth でログインできるようにする（ステップ9） |
+
+  - 最後の行だけは、auth に届く道ではなく、**auth を呼ぶ側（RP）の設定**を auth が持っている。ふつう client の設定は RP の側のリポジトリが持つ（sample-auth-client）が、Access の IdP はどのアプリのものでもない「Cloudflare から見た auth の窓口」なので、auth で持つ。Cloudflare のトークンは DNS 用と分けている（Access 用のトークンを `tf.sh` が渡す）。
 - 言語とフレームワークは、サンプル（[sample-oci-vm-docker](https://github.com/alphajinsei/sample-oci-vm-docker)）と同じ Node.js + TypeScript + Hono + Drizzle（MySQL）にし、テンプレートからコピーした。ブラウザ側のパスキーは必ず JavaScript になるので、サーバーとデータの形を共有できる。
 - 使うのは自分だけ。家族にデモで使ってもらうことはある。
 

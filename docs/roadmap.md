@@ -105,4 +105,4 @@
 - [x] 9-c：本番に載せ、自分のアカウントに email を入れる
 - [x] 9-d：Terraform に OIDC の IdP を足し、auth に client を登録する（最初は todo の Terraform に置いた）
 - [x] 9-d'：IdP を auth の Terraform に移す（todo は `removed`、auth は `import`）。secret を Vault に置き、`npm run register-access-client` で登録し直す
-- [ ] 9-e：todo の `/admin` に、auth のパスキーでログインする
+- [x] 9-e：todo の `/admin` に、auth のパスキーでログインする

@@ -55,7 +55,7 @@ Browser --> Cloudflare --HTTPS--> OCI LB (listener for this hostname)
 | `local.env` | `npm run dev` の接続情報（手元の MySQL。秘密情報ではない） |
 | `scripts/deploy.sh` | `npm run deploy`。ソースを app VM に送り、そこでビルドして入れ替える（`remote-deploy.sh` を VM で流す） |
 | `scripts/db-init.sh` | `npm run db:init`。初回だけ、ops からスキーマと専用のユーザーを作る（`remote-db-init.sh` を ops で流す） |
-| `infra/terraform/` | このアプリが共通基盤に足すもの：LB のホスト名・リスナー・バックエンド・セット（`main.tf`）、DB のパスワード・TOTP の鍵・ID トークンの署名の鍵（Vault）、DNS レコード（`cloudflare.tf`）。名前・ポート・DB 名は `main.tf` の `locals` だけに書き、スクリプトは Terraform の出力から読む |
+| `infra/terraform/` | このアプリが共通基盤に足すもの：LB のホスト名・リスナー・バックエンド・セット（`main.tf`）、DB のパスワード・TOTP の鍵・ID トークンの署名の鍵（Vault）、DNS レコード（`cloudflare.tf`）、Cloudflare Access のログインの選択肢「auth.alphajinsei.com」と、その client_secret（`access-idp.tf`。登録は `npm run register-access-client`）。名前・ポート・DB 名は `main.tf` の `locals` だけに書き、スクリプトは Terraform の出力から読む |
 
 ## 3. 手元での開発
 
@@ -108,7 +108,7 @@ npm run demo:local                            # http://localhost:4000 → 「aut
 ```bash
 cd infra/terraform
 ./tf.sh init
-./tf.sh apply        # LB の振り分け、DB のパスワード（Vault）、DNS レコード
+./tf.sh apply        # LB の振り分け、DB のパスワード（Vault）、DNS レコード、Access の IdP
 cd ../..
 npm run db:init      # ops から、スキーマとユーザーを作る
 ```
