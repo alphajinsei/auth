@@ -103,5 +103,6 @@
 - [x] 9-a：`users.email`、`admin set-email`、`email` scope と `email`・`email_verified` のクレーム
 - [x] 9-b：`/token` と `/revoke` で `client_secret_post` も受ける
 - [x] 9-c：本番に載せ、自分のアカウントに email を入れる
-- [x] 9-d：todo の Terraform に OIDC の IdP を足し、auth に client を登録する
+- [x] 9-d：Terraform に OIDC の IdP を足し、auth に client を登録する（最初は todo の Terraform に置いた）
+- [ ] 9-d'：IdP を auth の Terraform に移す（todo は `removed`、auth は `import`）。secret を Vault に置き、`npm run register-access-client` で登録し直す
 - [ ] 9-e：todo の `/admin` に、auth のパスキーでログインする

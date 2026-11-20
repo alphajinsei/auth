@@ -35,7 +35,7 @@ auth に `admin create-client` で登録している RP。呼び出し元が増�
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `demo-app` | 学習用の RP | 手元（このリポジトリの `demo-app/`） | `http://localhost:4000/callback` | `openid profile` | `client_secret_basic` | 手元の `demo-app/.env`（git 管理外） | `sub`、`preferred_username`、`amr` | 4〜5 |
 | `sample-auth-client` | RP のひな形 | `sample-auth-client.alphajinsei.com` | `https://sample-auth-client.alphajinsei.com/callback` | `openid profile` | `client_secret_basic` | sample-auth-client の Terraform が作り、Vault | `sub`、`preferred_username`、`amr` | 6 |
-| `cloudflare-access` | todo を守る Cloudflare Access | `alphajinsei.cloudflareaccess.com` | `https://alphajinsei.cloudflareaccess.com/cdn-cgi/access/callback` | `openid email profile` | `client_secret_basic`（2026-11-20 に監査ログの `client_authenticated` で確かめた） | todo の Terraform が作り、Access の IdP の設定と state（R2） | `email`（Access のポリシーと照らす）、`amr`（Access の JWT に写る） | 9 |
+| `cloudflare-access` | todo を守る Cloudflare Access | `alphajinsei.cloudflareaccess.com` | `https://alphajinsei.cloudflareaccess.com/cdn-cgi/access/callback` | `openid email profile` | `client_secret_basic`（2026-11-20 に監査ログの `client_authenticated` で確かめた） | auth の Terraform（`infra/terraform/access-idp.tf`）が作り、Vault と Access の IdP の設定 | `email`（Access のポリシーと照らす）、`amr`（Access の利用者の情報に写る） | 9 |
 
 - `cloudflare-access` は Cloudflare のアカウントに1つの IdP の設定なので、todo 以外の Access のアプリ（hoikuen など）からも選べるようになる。使うアプリが増えたら、ここの「何か」を直す。
 
@@ -120,7 +120,7 @@ ID・パスワードだけ、ID・パスワード + TOTP、パスキー、を自
 
 ### 自分で書いていない RP（ステップ9）
 
-- 登録のしかたは、自分の RP と同じ（`admin create-client --secret-stdin`）。client_secret は RP の側の Terraform が作る。Access の場合は todo の Terraform が作って Access の IdP の設定に入れ、auth へは ssh で流し込む（Vault は経由しない。todo の Terraform は Cloudflare だけを扱うため）。
+- 登録のしかたは、自分の RP と同じ（`admin create-client --secret-stdin`）。client_secret は、ふつうは RP の側の Terraform が作る（sample-auth-client）。Access の IdP は Cloudflare のアカウントに1つの「auth の窓口」で、どのアプリのものでもないので、auth の Terraform（`infra/terraform/access-idp.tf`）が IdP ごと持つ。secret は Vault に置き、`npm run register-access-client` が app VM の上で Vault から読んで流し込む。
 - 相手の求めることは、ドキュメントで分かる範囲で合わせ、分からないこと（client の認証の方式など）は両方を受けて、監査ログで実際を確かめる。
 - 詳しくは [ステップ9の設計](steps/9-cloudflare-access.md)。
 
@@ -173,4 +173,5 @@ auth を、自分が管理するサービス全体の認証基盤にしていく
 - 2026-11-19：demo-app を `sample-auth-client` として独立させることにした。名前は、基盤（OCI、コンテナ）ではなく「auth を呼ぶ側」という役割で付けた。セッションは DB に置く（デプロイで切れないように）。client_secret は client の Terraform が作って Vault に置き、`admin create-client --secret-stdin` で auth に流し込む。auth への通信は公開の URL（Cloudflare の上のアプリと同じ道）。LDAP はやめ、これを最後のステップにした。
 - 2026-11-19：認可（アクセス制御）をステップ7として足した。RBAC で実務は足りるが、判断をモジュール（PDP）として切り出す作りを見るために、関係のタプルで答える PDP を小さく作る。
 - 2026-11-19：認可は実装しないことにした（来歴だけ）。メモを作ると、認証の話から論点がずれるため。
+- 2026-11-20：Access の IdP を、いったん todo の Terraform に置いたが、auth の Terraform に移した（todo は `removed`、auth は `import`）。IdP は todo に属さず、Access のどのアプリからも選べる auth の窓口なので。secret も Vault を通す形にそろえた。
 - 2026-11-20：todo を守る Cloudflare Access に「auth でログイン」を足すことにした（ステップ9）。そのために、email（`users.email`、`email` scope、`email_verified`）と `client_secret_post` を足す。本番に関わるコマンド（デプロイ、apply、client の登録）は、ユーザーが実行する。

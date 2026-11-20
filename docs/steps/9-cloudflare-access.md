@@ -73,7 +73,8 @@ sequenceDiagram
   - これを確かめないまま `true` にする IdP は危ない。RP が email で利用者を見分けていると、他人のアドレスを書いた人が、その人になりすませる。
 - **`email` scope**：OIDC Core 5.4 のとおり、`email` scope があるときだけ `email` と `email_verified` を入れる（ID トークンと `/userinfo` の両方）。
 - **client の認証**：`client_secret_post`（本文に `client_id` と `client_secret`）も受ける。両方の方式を同時に使ってきたら断る（RFC 6749 2.3：1つの要求で2つ以上の方式を使ってはいけない）。Discovery の `token_endpoint_auth_methods_supported` にも足す。どちらで来たかは監査ログに出し、Access がどちらを使うかを確かめる。
-- **client_secret の経路**：todo の Terraform が `random_password` で作り、Access の IdP の設定に入れる。auth へは `./tf.sh output -raw ...` から ssh で `admin create-client --secret-stdin` に流し込む（画面にもファイルにも出さない）。sample-auth-client は Vault を経由したが、todo の Terraform は Cloudflare だけを扱っていて OCI の Vault に触れないので、ここでは経由しない。secret は Terraform の state（R2、非公開）に残る。Access の IdP の設定にも同じ値が入るので、置き場所が増えるわけではない。
+- **IdP と client_secret の置き場所**：auth の Terraform（`infra/terraform/access-idp.tf`）。IdP は Cloudflare のアカウントに1つで、Access のどのアプリからも選べる auth の窓口なので、todo ではなく auth で持つ。secret は `random_password` で作って Vault に置き、Access の IdP の設定にも入れる。auth への登録は `npm run register-access-client`（app VM の上で Vault から読み、`admin create-client --secret-stdin` に流し込む。sample-auth-client と同じ経路）。Access の設定は、DNS 用とは別の Cloudflare のトークンで変える（`tf.sh` が渡す）。
+  - 経緯：最初は todo の Terraform に置き、secret は Vault を通さず ssh で流し込んだ。動いたあとで、置き場所が違うと気づいて移した（todo は `removed` で state から外し、auth は `import` で取り込む。IdP は作り直さない）。
 - **ワンタイムコードは残す**：auth が落ちたときに todo を編集できなくならないように、両方を選べるようにする。
 
 ## 5. 小分け
@@ -83,5 +84,5 @@ sequenceDiagram
 | 9-a | `users.email`、`set-email`、`email` scope、ID トークンと `/userinfo` の `email`・`email_verified`、Discovery | auth | Claude（手元で試す） |
 | 9-b | `/token` と `/revoke` で `client_secret_post` も受ける | auth | Claude（手元で試す） |
 | 9-c | 本番に載せる（マイグレーション、デプロイ）、自分のアカウントに email を入れる | auth | ユーザーがコマンドを実行 |
-| 9-d | todo の Terraform に IdP（OIDC、PKCE）と secret を足す。auth に client を登録する | todo、auth | Claude が書き、ユーザーが apply と登録を実行 |
+| 9-d | Terraform に IdP（OIDC、PKCE）と secret を足す。auth に client を登録する（のちに todo から auth の Terraform へ移した） | auth | Claude が書き、ユーザーが apply と登録を実行 |
 | 9-e | todo の `/admin` に、auth のパスキーでログインする。Access の「Test」でも確かめる | — | ユーザー |

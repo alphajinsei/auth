@@ -10,6 +10,7 @@
     "start": "node dist/index.js",
     "db:init": "bash scripts/db-init.sh",
     "deploy": "bash scripts/deploy.sh",
+		"register-access-client": "bash scripts/register-access-client.sh",
     "test": "tsx --test test/*.test.ts",
     "demo": "tsx watch --env-file=demo-app/.env demo-app/src/index.ts",
     "demo:local": "tsx watch --env-file=demo-app/local.env demo-app/src/index.ts"
