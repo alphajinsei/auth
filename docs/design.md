@@ -27,6 +27,18 @@
 - CLI とデバイスコードのフローは作らない。人間が画面でログインして承認する部分はブラウザの流れと同じで、違うのはトークンの受け取り方だけなので、ブラウザの流れを深く理解する方を優先する。
 - LDAP は学習だけにとどめ、このリポジトリでは作らない（ロードマップのステップ8）。のちに学習もやめた。
 
+### 登録している client（呼び出し元の台帳）
+
+auth に `admin create-client` で登録している RP。呼び出し元が増えたら、ここに1行足す（oci-platform の README のポートの台帳と同じ考え方）。client を変えたり消したりするときに、どこに影響するかをここで見る。secret の値は書かない。
+
+| client_id | 何か | 置き場所 | redirect_uri | scope | client の認証 | secret の置き場所 | 使うクレーム | ステップ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `demo-app` | 学習用の RP | 手元（このリポジトリの `demo-app/`） | `http://localhost:4000/callback` | `openid profile` | `client_secret_basic` | 手元の `demo-app/.env`（git 管理外） | `sub`、`preferred_username`、`amr` | 4〜5 |
+| `sample-auth-client` | RP のひな形 | `sample-auth-client.alphajinsei.com` | `https://sample-auth-client.alphajinsei.com/callback` | `openid profile` | `client_secret_basic` | sample-auth-client の Terraform が作り、Vault | `sub`、`preferred_username`、`amr` | 6 |
+| `cloudflare-access` | todo を守る Cloudflare Access | `alphajinsei.cloudflareaccess.com` | `https://alphajinsei.cloudflareaccess.com/cdn-cgi/access/callback` | `openid email profile` | 未確定（9-b で監査ログから確かめる） | todo の Terraform が作り、Access の IdP の設定と state（R2） | `email`（Access のポリシーと照らす） | 9（作業中） |
+
+- `cloudflare-access` は Cloudflare のアカウントに1つの IdP の設定なので、todo 以外の Access のアプリ（hoikuen など）からも選べるようになる。使うアプリが増えたら、ここの「何か」を直す。
+
 ## 3. 画面
 
 画面は2つの側に分かれる。どの方式でログインするかは IdP の中の事情で、アプリからは見えない。
