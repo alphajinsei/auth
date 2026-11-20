@@ -5,7 +5,7 @@
 - 設計：[docs/design.md](docs/design.md)
 - 進め方と進捗：[docs/roadmap.md](docs/roadmap.md)
 - 勉強メモ：[docs/notes/study-notes.md](docs/notes/study-notes.md)。長い解説は `docs/notes/extra-*.md`（番外編）に分け、勉強メモからリンクする。分野の全体像は [extra-auth-overview.md](docs/notes/extra-auth-overview.md)、用語は [extra-auth-terms.md](docs/notes/extra-auth-terms.md)
-- 図：登場人物の関係図は `docs/diagrams/*.drawio.svg`（architecture-diagram の skill）。通信の順序は Mermaid のシーケンス図を md に直接書く
+- 図：登場人物の関係図は `docs/diagrams/*.drawio.svg`（skill `philosophy` の diagrams）。通信の順序は Mermaid のシーケンス図を md に直接書く
 
 ## 関係するフォルダ
 
